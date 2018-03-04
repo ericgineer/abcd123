@@ -147,11 +147,11 @@ class hmm:
     """ Function to calculate the state likelihood matrix p(x_t | Q_t = q) """
     def stateLikelihood(self, obs):
         obs = np.atleast_2d(obs)
-        for s in range(N):
+        for s in range(self.N):
             #Needs scipy 0.14
-            np.random.seed(self.random_state.randint(1))
+            np.random.seed(self.randState.randint(1))
             self.B[s, :] = st.multivariate_normal.pdf(
-                obs.T, mean=self.mu[:, s].T, self.cov=C[:, :, s].T)
+                obs.T, mean=self.mu[:, s].T, cov=self.C[:, :, s].T)
             #This function can (and will!) return values >> 1
             #See the discussion here for the equivalent matlab function
             #https://groups.google.com/forum/#!topic/comp.soft-sys.matlab/YksWK0T74Ak
@@ -159,7 +159,7 @@ class hmm:
             #Densities can be anything, even infinite (at individual points)."
             #This is evaluating the density at individual points...
             
-        return B
+        return self.B
 
 
 
@@ -193,6 +193,14 @@ class hmm:
         beta = np.zeros(p.shape);
         gamma = np.zeros(p.shape)
         xi = np.zeros((self.N,self.N,T))
+        
+        # First calculate beta
+        beta[:, T-1] = np.ones(self.N)
+        for t in range(T-2,-1,-1):
+            beta[:, t] = np.dot(A, (p[:, t + 1] * beta[:, t + 1]))
+            beta[:, t] /= np.sum(beta[:, t])
+        
+        # Then compute the rest of the parameters
         for t in range(T):
             if t == 0:
                 alpha[:, t] = p[:, t] * self.prior.ravel()
@@ -201,16 +209,13 @@ class hmm:
                 
             alpha[:,t] /= np.sum(alpha[:,t])
             
-            beta[:, t] = np.dot(A, (p[:, t + 1] * beta[:, t + 1]))
-            beta[:, t] /= np.sum(beta[:, t])
-            
             gamma[:,t] = alpha[:,t] * beta[:,t] / np.sum(alpha[:,t]*beta[:,t])
             
-            for i in range(0,self.N):
-                for j in range(0,self.N):
-                    xi[i,j,t] = p[:,t] * beta[:,t] * self.A[i,j] * 
-            
-        return alpha, beta, gamma
+            for j in range(0,self.N):
+                xi[:,j,t] = p[:,t] * beta[:,t] * self.A[j,j] * alpha[:,t-1]
+                xi[:,j,t] /= np.sum(alpha[:,t]*beta[:,t])
+         
+        return alpha, beta, gamma, xi
     
     def normalize(x):
         return (x + (x == 0)) / np.sum(x)
@@ -221,6 +226,16 @@ class hmm:
     
 
 if __name__ == "__main__":
+    
+    # Load some training MFCC data
+    trainData = np.loadtxt('MFCC/odessa.csv',delimiter=',')
+    trainData = trainData[:,2:trainData.shape[1]-2]
+    
+    # Load a wav file
+    FILENAME = "audio/odessa.wav" # Name of wav file
+    fs, wavData = scipy.io.wavfile.read(FILENAME)
+    
+    
     """ WAV file parameters """
     #fs = 16000 # Sample rate (Hz)
     frameSize = 10 # Frame size in ms
@@ -233,13 +248,7 @@ if __name__ == "__main__":
                    # and the start of the next frame
     numCoef   = 13 # Number of MFCC coefficients
     
-    # Load some training MFCC data
-    trainData = np.loadtxt('MFCC/odessa.csv',delimiter=',')
-    trainData = trainData[:,2:trainData.shape[1]-2]
     
-    # Load a wav file
-    FILENAME = "audio/odessa.wav" # Name of wav file
-    fs, wavData = scipy.io.wavfile.read(FILENAME)
     
     mfccVect = mfcc.mfcc(wavData, fs, frameSize, skipSize, numCoef)
     
@@ -255,6 +264,10 @@ if __name__ == "__main__":
     
     hmm1 = hmm(10, mfccVect)
     A = hmm1.A
+    
+    p = hmm1.stateLikelihood(mfccVect)
+    
+    alpha, beta, gamma, xi = hmm1.recursion(p)
     
     
     
