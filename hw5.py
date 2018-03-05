@@ -17,7 +17,7 @@ class mfcc:
         self.pastFrames = 15 # Number of past frames to use for threshold comparison
         self.pastEs = np.zeros(self.pastFrames)
         self.silenceDetectVect = []
-        self.dataVect = np.zeros((frameSamples,1))
+        self.dataVect = np.zeros((self.frameSamples,1))
     
     """ Silence detection function """
     
@@ -166,7 +166,12 @@ class hmm:
             #This is evaluating the density at individual points...
             
         return self.B
-
+    
+    """ Calculate the probability of evidence p(x_1:T) """
+    def probEvidence(self, mfcc):
+        p = hmm.stateLikelihood(self, mfcc)
+        alpha, beta, gamma, xi = hmm.recursion(self, p)
+        return np.sum(alpha * beta, axis=0)
 
 
     """ Expectation-Maximization (EM) algorithm initializiation function """
@@ -194,7 +199,7 @@ class hmm:
         # First calculate beta
         beta[:, T-1] = np.ones(self.N)
         for t in range(T-2,-1,-1):
-            beta[:, t] = np.dot(A, (p[:, t + 1] * beta[:, t + 1]))
+            beta[:, t] = np.dot(self.A, (p[:, t + 1] * beta[:, t + 1]))
             beta[:, t] /= np.sum(beta[:, t])
         
         # Then compute the rest of the parameters
@@ -215,17 +220,39 @@ class hmm:
         return alpha, beta, gamma, xi
     
     """ Expectation-Maximization algorithm """
-    def em(self, Dw, numDataSets):
+    def em(self, Dw):
+        w = Dw.shape[0]
         T = Dw.shape[1]
         pi = np.zeros((self.N,T))
-        #hmm.emInit(self, Dw[:,:,0])
-        for L in range(0, numDataSets):
+        for L in range(0, Dw.shape[2]):
             p = hmm.stateLikelihood(self, Dw[:,:,L])
             alpha, beta, gamma, xi = hmm.recursion(self, p)
             pi += 1/numDataSets * alpha[1,:] * beta[1,:] / np.sum(alpha[1,:] * beta[1,:])
             self.A[:,:] += np.sum(xi, axis=2) / np.sum(gamma,axis=1)
-            self.mu += np.
-        return A
+            
+            # Zero out elements in matrix A to make the state transitions only
+            # left to right
+            for i in range(0,self.N):
+                for j in range(0,self.N):
+                    if j > i + 1 or j < i:
+                        self.A[i,j] = 0
+            
+            for q in range(0,self.N): # iterate over the number of states
+                self.mu[:,q] += np.sum(Dw[:,:,L]*gamma[q,:])/np.sum(gamma[q,:])
+                self.mu[:,q] /= np.sum(self.mu[:,q]) # Normalize mu to avoid underflow
+                
+                self.C[:,:,q] += np.diag(np.sum((Dw[:,:,L]-np.reshape(self.mu[:,q],(w,1)))*
+                            (Dw[:,:,L]-np.reshape(self.mu[:,q],(w,1)))*gamma[q,:],axis=1)/
+                            np.sum(gamma[q,:]))
+    
+    """ A function to train the HMM on a sequence of data """
+    def train(self, Dw):
+        hmm.emInit(self, Dw[:,:,0])
+        
+        for i in range(0,15):
+            print("Iteration number " + str(i))
+            hmm.em(self, Dw)
+            
             
         
 if __name__ == "__main__":
@@ -241,6 +268,7 @@ if __name__ == "__main__":
     FILENAME = "audio/odessa/odessa1.wav" # Name of wav file
     fs, wavData = scipy.io.wavfile.read(FILENAME)    
     mfccVect = mfcc.getMfcc(wavData, fs, frameSize, skipSize, numCoef)
+    OdessaMfcc = mfccVect
     Dw = np.zeros((mfccVect.shape[0],mfccVect.shape[1],numDataSets))
     Dw[:,:,0] = mfccVect
     for i in range(1,numDataSets):
@@ -252,15 +280,35 @@ if __name__ == "__main__":
     
 #    mfccVect = mfcc.mfcc(wavData, fs, frameSize, skipSize, numCoef)
 #    
-#    
+#   
+    # Initialize HMM
     hmm1 = hmm(30, mfccVect)
-    A = hmm1.A
-   
-    p = hmm1.stateLikelihood(mfccVect)
     
-    alpha, beta, gamma, xi = hmm1.recursion(p)
+    # Train the HMM
+    hmm1.train(Dw)
     
-    Anew = hmm1.em(Dw, numDataSets)
+    # Load a test wave file
+    FILENAME = "audio/WhatTimeIsIt/WhatTimeIsIt1.wav" # Name of wav file
+    fs, wavData = scipy.io.wavfile.read(FILENAME)    
+    WhatTimeIsItMfcc = mfcc.getMfcc(wavData, fs, frameSize, skipSize, numCoef)
+    
+    FILENAME = "audio/PlayMusic/PlayMusic1.wav" # Name of wav file
+    fs, wavData = scipy.io.wavfile.read(FILENAME)    
+    PlayMusicMfcc = mfcc.getMfcc(wavData, fs, frameSize, skipSize, numCoef)
+    
+    # Test with "Odessa"
+    probOdessa = hmm1.probEvidence(OdessaMfcc)
+    
+    # Test with "What time is it"
+    probWhatTimeIsIt = hmm1.probEvidence(WhatTimeIsItMfcc)
+    
+    # Test with "Play music"
+    probPlayMusic = hmm1.probEvidence(PlayMusicMfcc)
+    
+    print("Likelihood of Odessa: ",np.sum(probOdessa))
+    print("Likelihood of What time is it: ",np.sum(probWhatTimeIsIt))
+    print("Likelihood of Play music: ",np.sum(probPlayMusic))
+    
     
     
     
