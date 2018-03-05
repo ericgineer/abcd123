@@ -105,6 +105,12 @@ class mfcc:
             count += 1
             
         return c
+    
+    """ Call this function to get the mfcc data in the correct array form """
+    def getMfcc(x, fs, frameSize, skipSize, numCoef):
+        c = mfcc.mfcc(x, fs, frameSize, skipSize, numCoef)
+        c = mfcc.deltaFeature(c, 2, numCoef)
+        return c
 
 class hmm:
     """ A class to implement a HMM for speech recognition """
@@ -164,24 +170,15 @@ class hmm:
 
 
     """ Expectation-Maximization (EM) algorithm initializiation function """
-    def emInit(self, mfcc):
-        global N
-        global A
-        global prior
-        global mu
-        global C
-    
+    def emInit(self, mfcc):    
         # Initialize transition matrix to be random with each row summing to 1
-        M = np.random.rand(N,N)
-        A = M/M.sum(axis=1)[:,None]
-        # Initialize state distribution vector
-        prior = np.random.rand(N,1)
-        prior /= max(prior)
+        M = np.random.rand(self.N,self.N)
+        self.A = M/M.sum(axis=1)[:,None]
         
-        subset = self.random_state.choice(np.arange(mfcc.shape[0]), size=N, replace=True)
-        mu = mfcc[:, subset]
+        subset = self.randState.choice(np.arange(mfcc.shape[0]), size=self.N, replace=True)
+        self.mu = mfcc[:, subset]
     
-        C = np.zeros((mfcc.shape[0], mfcc.shape[0], N))
+        C = np.zeros((mfcc.shape[0], mfcc.shape[0], self.N))
         C += np.diag(np.diag(np.cov(mfcc)))[:, :, None]
 
 
@@ -217,57 +214,53 @@ class hmm:
          
         return alpha, beta, gamma, xi
     
-    def normalize(x):
-        return (x + (x == 0)) / np.sum(x)
-    
-    def stochasticize(x):
-        return (x + (x == 0)) / np.sum(x, axis=1)
+    """ Expectation-Maximization algorithm """
+    def em(self, Dw, numDataSets):
+        T = Dw.shape[1]
+        pi = np.zeros((self.N,T))
+        #hmm.emInit(self, Dw[:,:,0])
+        for L in range(0, numDataSets):
+            p = hmm.stateLikelihood(self, Dw[:,:,L])
+            alpha, beta, gamma, xi = hmm.recursion(self, p)
+            pi += 1/numDataSets * alpha[1,:] * beta[1,:] / np.sum(alpha[1,:] * beta[1,:])
+            self.A[:,:] += np.sum(xi, axis=2) / np.sum(gamma,axis=1)
+            self.mu += np.
+        return A
+            
         
-    
-
 if __name__ == "__main__":
-    
-    # Load some training MFCC data
-    trainData = np.loadtxt('MFCC/odessa.csv',delimiter=',')
-    trainData = trainData[:,2:trainData.shape[1]-2]
-    
-    # Load a wav file
-    FILENAME = "audio/odessa.wav" # Name of wav file
-    fs, wavData = scipy.io.wavfile.read(FILENAME)
-    
-    
-    """ WAV file parameters """
-    #fs = 16000 # Sample rate (Hz)
-    frameSize = 10 # Frame size in ms
-    frameSamples = int(frameSize/1000 * fs)
-    CHANNELS = 1
-    
     """ MFCC parameters """
     frameSize = 25 # Length of the frame in milliseconds
     skipSize  = 10 # Time difference in milliseconds between the start of one frame 
                    # and the start of the next frame
     numCoef   = 13 # Number of MFCC coefficients
     
+    numDataSets   = 10 
     
+    # Load some training wav files to get MFCC training data
+    FILENAME = "audio/odessa/odessa1.wav" # Name of wav file
+    fs, wavData = scipy.io.wavfile.read(FILENAME)    
+    mfccVect = mfcc.getMfcc(wavData, fs, frameSize, skipSize, numCoef)
+    Dw = np.zeros((mfccVect.shape[0],mfccVect.shape[1],numDataSets))
+    Dw[:,:,0] = mfccVect
+    for i in range(1,numDataSets):
+        FILENAME = "audio/odessa/odessa" + str(i) + ".wav" # Name of wav file
+        print("Reading wave file " + FILENAME)
+        fs, wavData = scipy.io.wavfile.read(FILENAME)
+        mfccVect = mfcc.getMfcc(wavData, fs, frameSize, skipSize, numCoef)
+        Dw[:,:,i] = mfccVect
     
-    mfccVect = mfcc.mfcc(wavData, fs, frameSize, skipSize, numCoef)
-    
-#    emInit(data)
+#    mfccVect = mfcc.mfcc(wavData, fs, frameSize, skipSize, numCoef)
 #    
-#    B = stateLikelihood(data)
 #    
-#    log_likelihood, alpha = forwardRec(B)
-#    beta = backwardRec(B)
-    
-    
-    #log_likelihood = train(data)
-    
-    hmm1 = hmm(10, mfccVect)
+    hmm1 = hmm(30, mfccVect)
     A = hmm1.A
-    
+   
     p = hmm1.stateLikelihood(mfccVect)
     
     alpha, beta, gamma, xi = hmm1.recursion(p)
+    
+    Anew = hmm1.em(Dw, numDataSets)
     
     
     
