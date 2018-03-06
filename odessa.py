@@ -123,6 +123,11 @@ class hmm:
         
         self.n_dims = []
         
+        self.testGamma = []
+        self.testXi = []
+        
+        self.covs = []
+        
         # Initialize transition matrix with random probabilities
         self.A = np.zeros((self.N, self.N))
         for i in range(0,self.N):
@@ -179,7 +184,7 @@ class hmm:
 
 
     """ Expectation-Maximization (EM) algorithm initializiation function """
-    def emInit(self, mfcc):    
+    def emInit(self, mfcc):
         # Initialize transition matrix to be random with each row summing to 1
         M = np.random.rand(self.N,self.N)
         self.A = M/M.sum(axis=1)[:,None]
@@ -189,39 +194,46 @@ class hmm:
     
         C = np.zeros((mfcc.shape[0], mfcc.shape[0], self.N))
         C += np.diag(np.diag(np.cov(mfcc)))[:, :, None]
+        
+        self.covs = np.zeros((mfcc.shape[0], mfcc.shape[0], self.N))
+        self.covs += np.diag(np.diag(np.cov(mfcc)))[:, :, None]
 
 
     
     """ Calculate the forward recursion, backward recursion, gamma, and xi """
-    def recursion(self, p):
+    def recursion(self, B):
         logLikelihood = 0.
-        T = p.shape[1]
-        alpha = np.zeros(p.shape)
-        beta = np.zeros(p.shape);
-        gamma = np.zeros(p.shape)
-        xi = np.zeros((self.N,self.N,T))
+        T = B.shape[1]
+        alpha = np.zeros(B.shape)
+        beta = np.zeros(B.shape);
+        gamma = np.zeros(B.shape)
+        xi = np.zeros((self.N,self.N))
         
         # First calculate beta
         beta[:, T-1] = np.ones(self.N)
         for t in range(T-2,-1,-1):
-            beta[:, t] = np.dot(self.A, (p[:, t + 1] * beta[:, t + 1]))
+            beta[:, t] = np.sum(beta[:, t + 1] * B[:, t + 1] * self.A,axis=1)
             beta[:, t] /= np.sum(beta[:, t])
         
         # Then compute the rest of the parameters
         for t in range(T):
             if t == 0:
-                alpha[:, t] = p[:, t] * self.prior.ravel()
+                alpha[:, t] = B[:, t] * self.prior.ravel()
             else:
-                alpha[:, t] = p[:, t] * np.dot(self.A.T, alpha[:, t - 1])
+                #alpha[:, t] = B[:, t] * np.sum(self.A * alpha[:, t - 1],axis=1)
+                alpha[:, t] = B[:, t] * np.dot(self.A.T, alpha[:, t - 1])
             
             logLikelihood += np.log(np.sum(alpha[:, t]))
             alpha[:,t] /= np.sum(alpha[:,t])
             
             gamma[:,t] = alpha[:,t] * beta[:,t] / np.sum(alpha[:,t]*beta[:,t])
             
-            for j in range(0,self.N):
-                xi[:,j,t] = p[:,t] * beta[:,t] * self.A[j,j] * alpha[:,t-1]
-                xi[:,j,t] /= np.sum(alpha[:,t]*beta[:,t])
+            #xiTmp[:,:,t] = B[:,t] * beta[:,t] * self.A * alpha[:,t-1]
+            if t == 0:
+                xiTmp = self.A * np.dot(self.prior.ravel(), (beta[:, t] * B[:, t]).T)
+            else:
+                xiTmp = self.A * np.dot(alpha[:, t-1], (beta[:, t] * B[:, t]).T)
+            xi += self._normalize(xiTmp)
         return alpha, beta, gamma, xi, logLikelihood
     
     def _forward(self, B):
@@ -258,30 +270,46 @@ class hmm:
             numDataSets = Dw.shape[2]
         else:
             numDataSets = 1
-        pi = np.zeros((self.N,T))
+            
         for L in range(0, numDataSets):
             if np.array(Dw.shape).size > 2:            
                 p = hmm.stateLikelihood(self, Dw[:,:,L])
             else:
                 p = hmm.stateLikelihood(self, Dw)
             alpha, beta, gamma, xi, logLikelihood = hmm.recursion(self, p)
-            pi += 1/numDataSets * alpha[1,:] * beta[1,:] / np.sum(alpha[1,:] * beta[1,:])
-            self.A[:,:] += np.sum(xi, axis=2) / np.sum(gamma,axis=1)
+            #self.A = xi / np.sum(gamma,axis=0)
+            self.A = hmm._stochasticize(self, xi)
             
-            # Zero out elements in matrix A to make the state transitions only
-            # left to right
-            for i in range(0,self.N):
-                for j in range(0,self.N):
-                    if j > i + 1 or j < i:
-                        self.A[i,j] = 0
+#            # Zero out elements in matrix A to make the state transitions only
+#            # left to right
+#            for i in range(0,self.N):
+#                for j in range(0,self.N):
+#                    if j > i + 1 or j < i:
+#                        self.A[i,j] = 0
             
-            for q in range(0,self.N): # iterate over the number of states
-                if np.array(Dw.shape).size > 2:
-                    self.mu[:,q] += np.sum(Dw[:,:,L]*gamma[q,:])/np.sum(gamma[q,:])
-                else:
-                    self.mu[:,q] += np.sum(Dw*gamma[q,:])/np.sum(gamma[q,:])
-                self.mu[:,q] /= np.sum(self.mu[:,q]) # Normalize mu to avoid underflow
-                
+#            for q in range(0,self.N): # iterate over the number of states
+#                if np.array(Dw.shape).size > 2:
+#                    self.mu[:,q] += np.sum(Dw[:,:,L]*gamma[q,:])/np.sum(gamma[q,:])
+#                else:
+#                    self.mu[:,q] += np.sum(Dw*gamma[q,:],axis=1)/np.sum(gamma[q,:])
+#                    #self.mu[:,q] /= np.sum(self.mu[:,q]) # Normalize mu to avoid underflow
+#                
+#                if np.array(Dw.shape).size > 2:
+#                    self.C[:,:,q] += np.diag(np.sum((Dw[:,:,L]-np.reshape(self.mu[:,q],(w,1)))*
+#                            (Dw[:,:,L]-np.reshape(self.mu[:,q],(w,1)))*gamma[q,:],axis=1)/
+#                            np.sum(gamma[q,:]))
+#                else:
+#                    self.C[:,:,q] += np.diag(np.sum((Dw-np.reshape(self.mu[:,q],(w,1)))*
+#                            (Dw-np.reshape(self.mu[:,q],(w,1)))*gamma[q,:],axis=1)/
+#                            np.sum(gamma[q,:]))
+            
+            gamma_state_sum = np.sum(gamma, axis=1)
+            for q in range(self.N):
+                gamma_obs = Dw * gamma[q, :]
+                self.mu[:, q] = np.sum(gamma_obs, axis=1) / gamma_state_sum[q]
+                #self.C = np.dot(gamma_obs, Dw.T) / gamma_state_sum[q] - np.dot(self.mu[:, q], self.mu[:, q].T)
+                #Symmetrize
+                #self.C = np.triu(self.C) + np.triu(self.C).T - np.diag(self.C)
                 if np.array(Dw.shape).size > 2:
                     self.C[:,:,q] += np.diag(np.sum((Dw[:,:,L]-np.reshape(self.mu[:,q],(w,1)))*
                             (Dw[:,:,L]-np.reshape(self.mu[:,q],(w,1)))*gamma[q,:],axis=1)/
@@ -290,6 +318,8 @@ class hmm:
                     self.C[:,:,q] += np.diag(np.sum((Dw-np.reshape(self.mu[:,q],(w,1)))*
                             (Dw-np.reshape(self.mu[:,q],(w,1)))*gamma[q,:],axis=1)/
                             np.sum(gamma[q,:]))
+            # Ensure positive semidefinite by adding diagonal loading
+            self.C = self.C + .01 * np.eye(Dw.shape[0])[:, :, None]
                 
     def _normalize(self, x):
         return (x + (x == 0)) / np.sum(x)
@@ -339,7 +369,7 @@ class hmm:
             partial_covs = np.triu(partial_covs) + np.triu(partial_covs).T - np.diag(partial_covs)
         
         #Ensure positive semidefinite by adding diagonal loading
-        expected_covs += .01 * np.eye(self.n_dims)[:, :, None]
+        expected_covs = partial_covs + .01 * np.eye(self.n_states)[:, :, None]
         
 #        # Zero out elements in matrix A to make the state transitions only
 #        # left to right
@@ -352,6 +382,11 @@ class hmm:
         self.mu = expected_mu
         self.covs = expected_covs
         self.A = expected_A
+        
+        self.testGamma = gamma
+        self.testXi = xi_sum
+        
+        
         return log_likelihood
     
     """ A function to train the HMM on a sequence of data """
@@ -362,4 +397,5 @@ class hmm:
             hmm.emInit(self, Dw)
         for i in range(0,15):
             print("Iteration number " + str(i))
-            hmm._em_step(self, Dw)
+            #hmm._em_step(self, Dw)
+            hmm.em(self, Dw)

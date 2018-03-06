@@ -103,4 +103,12 @@ if __name__ == "__main__":
     logLikelihood1, a1 = hmm3._forward(B)
     b1 = hmm3._backward(B)
     
-    a2, b2, gamma, xi, logLikelihood2 = hmm3.recursion(B)
+    gamma1 = hmm3.testGamma
+    xi1 = hmm3.testXi
+    
+    a2, b2, gamma2, xi2, logLikelihood2 = hmm3.recursion(B)
+    
+    A = hmm3.A
+    mu = hmm3.mu
+    C = hmm3.C
+    cov = hmm3.covs
