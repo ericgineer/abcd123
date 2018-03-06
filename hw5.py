@@ -170,9 +170,8 @@ class hmm:
     """ Calculate the probability of evidence p(x_1:T) """
     def probEvidence(self, mfcc):
         p = hmm.stateLikelihood(self, mfcc)
-        alpha, beta, gamma, xi, logLikelihood = hmm.recursion(self, p)
-        #return np.sum(alpha * beta, axis=0)
-        return logLikelihood
+        alpha, beta, gamma, xi = hmm.recursion(self, p)
+        return np.log(np.sum(np.sum(alpha*beta,axis=0)))
 
 
     """ Expectation-Maximization (EM) algorithm initializiation function """
@@ -218,9 +217,7 @@ class hmm:
             for j in range(0,self.N):
                 xi[:,j,t] = p[:,t] * beta[:,t] * self.A[j,j] * alpha[:,t-1]
                 xi[:,j,t] /= np.sum(alpha[:,t]*beta[:,t])
-        logLikelihood = np.log(np.sum(np.sum(alpha*beta,axis=0)))
-         
-        return alpha, beta, gamma, xi, logLikelihood
+        return alpha, beta, gamma, xi
     
     """ Expectation-Maximization algorithm """
     def em(self, Dw):
@@ -229,7 +226,7 @@ class hmm:
         pi = np.zeros((self.N,T))
         for L in range(0, Dw.shape[2]):            
             p = hmm.stateLikelihood(self, Dw[:,:,L])
-            alpha, beta, gamma, xi, logLikelihood = hmm.recursion(self, p)
+            alpha, beta, gamma, xi = hmm.recursion(self, p)
             pi += 1/numDataSets * alpha[1,:] * beta[1,:] / np.sum(alpha[1,:] * beta[1,:])
             self.A[:,:] += np.sum(xi, axis=2) / np.sum(gamma,axis=1)
             
