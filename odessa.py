@@ -4,8 +4,6 @@ import scipy.io.wavfile
 from scipy.fftpack import dct
 import scipy.stats as st
 
-plt.close('all')
-
 """ A class for implementing the MFCC and silence detector functions """
 class mfcc:
     def __init__(self):
@@ -119,7 +117,11 @@ class hmm:
         """ Initialize HMM variables """
         self.N = numStates  # Number of states to use in the HMM
                             # (should be the number of phonenems in the phrase)
+                            
+        self.n_states = numStates
         self.randState = np.random.RandomState(0)
+        
+        self.n_dims = []
         
         # Initialize transition matrix with random probabilities
         self.A = np.zeros((self.N, self.N))
@@ -170,8 +172,10 @@ class hmm:
     """ Calculate the probability of evidence p(x_1:T) """
     def probEvidence(self, mfcc):
         p = hmm.stateLikelihood(self, mfcc)
-        alpha, beta, gamma, xi = hmm.recursion(self, p)
-        return np.log(np.sum(np.sum(alpha*beta,axis=0)))
+        #alpha, beta, gamma, xi, logLikelihood = hmm.recursion(self, p)
+        #pEvidence = np.log(np.sum(alpha*beta,axis=0))
+        logLikelihood, alpha = hmm._forward(self, p)
+        return logLikelihood
 
 
     """ Expectation-Maximization (EM) algorithm initializiation function """
@@ -190,7 +194,7 @@ class hmm:
     
     """ Calculate the forward recursion, backward recursion, gamma, and xi """
     def recursion(self, p):
-        logLikelihood = 0
+        logLikelihood = 0.
         T = p.shape[1]
         alpha = np.zeros(p.shape)
         beta = np.zeros(p.shape);
@@ -209,7 +213,8 @@ class hmm:
                 alpha[:, t] = p[:, t] * self.prior.ravel()
             else:
                 alpha[:, t] = p[:, t] * np.dot(self.A.T, alpha[:, t - 1])
-                
+            
+            logLikelihood += np.log(np.sum(alpha[:, t]))
             alpha[:,t] /= np.sum(alpha[:,t])
             
             gamma[:,t] = alpha[:,t] * beta[:,t] / np.sum(alpha[:,t]*beta[:,t])
@@ -217,16 +222,49 @@ class hmm:
             for j in range(0,self.N):
                 xi[:,j,t] = p[:,t] * beta[:,t] * self.A[j,j] * alpha[:,t-1]
                 xi[:,j,t] /= np.sum(alpha[:,t]*beta[:,t])
-        return alpha, beta, gamma, xi
+        return alpha, beta, gamma, xi, logLikelihood
+    
+    def _forward(self, B):
+        log_likelihood = 0.
+        T = B.shape[1]
+        alpha = np.zeros(B.shape)
+        for t in range(T):
+            if t == 0:
+                alpha[:, t] = B[:, t] * self.prior.ravel()
+            else:
+                alpha[:, t] = B[:, t] * np.dot(self.A.T, alpha[:, t - 1])
+         
+            alpha_sum = np.sum(alpha[:, t])
+            alpha[:, t] /= alpha_sum
+            log_likelihood = log_likelihood + np.log(alpha_sum)
+        return log_likelihood, alpha
+    
+    def _backward(self, B):
+        T = B.shape[1]
+        beta = np.zeros(B.shape);
+           
+        beta[:, -1] = np.ones(B.shape[0])
+            
+        for t in range(T - 1)[::-1]:
+            beta[:, t] = np.dot(self.A, (B[:, t + 1] * beta[:, t + 1]))
+            beta[:, t] /= np.sum(beta[:, t])
+        return beta
     
     """ Expectation-Maximization algorithm """
     def em(self, Dw):
         w = Dw.shape[0]
         T = Dw.shape[1]
+        if np.array(Dw.shape).size > 2:
+            numDataSets = Dw.shape[2]
+        else:
+            numDataSets = 1
         pi = np.zeros((self.N,T))
-        for L in range(0, Dw.shape[2]):            
-            p = hmm.stateLikelihood(self, Dw[:,:,L])
-            alpha, beta, gamma, xi = hmm.recursion(self, p)
+        for L in range(0, numDataSets):
+            if np.array(Dw.shape).size > 2:            
+                p = hmm.stateLikelihood(self, Dw[:,:,L])
+            else:
+                p = hmm.stateLikelihood(self, Dw)
+            alpha, beta, gamma, xi, logLikelihood = hmm.recursion(self, p)
             pi += 1/numDataSets * alpha[1,:] * beta[1,:] / np.sum(alpha[1,:] * beta[1,:])
             self.A[:,:] += np.sum(xi, axis=2) / np.sum(gamma,axis=1)
             
@@ -238,175 +276,90 @@ class hmm:
                         self.A[i,j] = 0
             
             for q in range(0,self.N): # iterate over the number of states
-                self.mu[:,q] += np.sum(Dw[:,:,L]*gamma[q,:])/np.sum(gamma[q,:])
+                if np.array(Dw.shape).size > 2:
+                    self.mu[:,q] += np.sum(Dw[:,:,L]*gamma[q,:])/np.sum(gamma[q,:])
+                else:
+                    self.mu[:,q] += np.sum(Dw*gamma[q,:])/np.sum(gamma[q,:])
                 self.mu[:,q] /= np.sum(self.mu[:,q]) # Normalize mu to avoid underflow
                 
-                self.C[:,:,q] += np.diag(np.sum((Dw[:,:,L]-np.reshape(self.mu[:,q],(w,1)))*
+                if np.array(Dw.shape).size > 2:
+                    self.C[:,:,q] += np.diag(np.sum((Dw[:,:,L]-np.reshape(self.mu[:,q],(w,1)))*
                             (Dw[:,:,L]-np.reshape(self.mu[:,q],(w,1)))*gamma[q,:],axis=1)/
                             np.sum(gamma[q,:]))
+                else:
+                    self.C[:,:,q] += np.diag(np.sum((Dw-np.reshape(self.mu[:,q],(w,1)))*
+                            (Dw-np.reshape(self.mu[:,q],(w,1)))*gamma[q,:],axis=1)/
+                            np.sum(gamma[q,:]))
+                
+    def _normalize(self, x):
+        return (x + (x == 0)) / np.sum(x)
+    
+    def _stochasticize(self, x):
+        return (x + (x == 0)) / np.sum(x, axis=1)
+                
+    def _em_step(self, obs): 
+        obs = np.atleast_2d(obs)
+        B = self.stateLikelihood(obs)
+        T = obs.shape[1]
+        
+        self.n_dims = obs.shape[0]
+        
+        #log_likelihood, alpha = self._forward(B)
+        #beta = self._backward(B)
+        
+        alpha, beta, gamma, xi, log_likelihood = hmm.recursion(self, B)
+        
+        xi_sum = np.zeros((self.n_states, self.n_states))
+        gamma = np.zeros((self.n_states, T))
+        
+        for t in range(T - 1):
+            partial_sum = self.A * np.dot(alpha[:, t], (beta[:, t] * B[:, t + 1]).T)
+            xi_sum += self._normalize(partial_sum)
+            partial_g = alpha[:, t] * beta[:, t]
+            gamma[:, t] = self._normalize(partial_g)
+              
+        partial_g = alpha[:, -1] * beta[:, -1]
+        gamma[:, -1] = self._normalize(partial_g)
+        
+        expected_prior = gamma[:, 0]
+        expected_A = self._stochasticize(xi_sum)
+        
+        expected_mu = np.zeros((self.n_dims, self.n_states))
+        expected_covs = np.zeros((self.n_dims, self.n_dims, self.n_states))
+        
+        gamma_state_sum = np.sum(gamma, axis=1)
+        #Set zeros to 1 before dividing
+        gamma_state_sum = gamma_state_sum + (gamma_state_sum == 0)
+        
+        for s in range(self.n_states):
+            gamma_obs = obs * gamma[s, :]
+            expected_mu[:, s] = np.sum(gamma_obs, axis=1) / gamma_state_sum[s]
+            partial_covs = np.dot(gamma_obs, obs.T) / gamma_state_sum[s] - np.dot(expected_mu[:, s], expected_mu[:, s].T)
+            #Symmetrize
+            partial_covs = np.triu(partial_covs) + np.triu(partial_covs).T - np.diag(partial_covs)
+        
+        #Ensure positive semidefinite by adding diagonal loading
+        expected_covs += .01 * np.eye(self.n_dims)[:, :, None]
+        
+#        # Zero out elements in matrix A to make the state transitions only
+#        # left to right
+#        for i in range(0,self.n_states):
+#            for j in range(0,self.n_states):
+#                if j > i + 1 or j < i:
+#                    expected_A[i,j] = 0
+        
+        self.prior = expected_prior
+        self.mu = expected_mu
+        self.covs = expected_covs
+        self.A = expected_A
+        return log_likelihood
     
     """ A function to train the HMM on a sequence of data """
-    def train(self, Dw):   
-        hmm.emInit(self, Dw[:,:,0])
+    def train(self, Dw):
+        if np.array(Dw.shape).size > 2:
+            hmm.emInit(self, Dw[:,:,0])
+        else:
+            hmm.emInit(self, Dw)
         for i in range(0,15):
             print("Iteration number " + str(i))
-            hmm.em(self, Dw)
-            
-def loadWavData(phrase, frameSize, skipSize, numCoef, numDataSets):
-    # Load some training wav files to get MFCC training data
-    FILENAME = "audio/" + phrase + "/" + phrase + "1.wav" # Name of wav file
-    fs, wavData = scipy.io.wavfile.read(FILENAME)    
-    mfccVect = mfcc.getMfcc(wavData, fs, frameSize, skipSize, numCoef)
-    Dw = np.zeros((mfccVect.shape[0],mfccVect.shape[1],numDataSets))
-    Dw[:,:,0] = mfccVect
-    for i in range(1,numDataSets+1):
-        FILENAME = "audio/" + phrase + "/" + phrase + str(i) + ".wav" # Name of wav file
-        print("Reading wave file " + FILENAME)
-        fs, wavData = scipy.io.wavfile.read(FILENAME)
-        mfccVect = mfcc.getMfcc(wavData, fs, frameSize, skipSize, numCoef)
-        Dw[:,:,i-1] = mfccVect
-    return Dw
-        
-if __name__ == "__main__":
-    """ MFCC parameters """
-    frameSize = 25 # Length of the frame in milliseconds
-    skipSize  = 10 # Time difference in milliseconds between the start of one frame 
-                   # and the start of the next frame
-    numCoef   = 13 # Number of MFCC coefficients
-    
-    numDataSets   = 10 
-    
-    
-    # Load "Odessa" training data
-    Dw1 = loadWavData("odessa", frameSize, skipSize, numCoef, numDataSets)
-    OdessaMfcc = Dw1[:,:,0]
-    
-    # Initialize the "Odessa" HMM
-    hmm1 = hmm(6, Dw1[:,:,0])
-    
-    # Train the "Odessa" HMM
-    hmm1.train(Dw1)
-    
-    
-    # Load "What time is it" training data
-    Dw2 = loadWavData("WhatTimeIsIt", frameSize, skipSize, numCoef, numDataSets)
-    WhatTimeIsItMfcc = Dw2[:,:,0]
-    
-    # Initialize the "What time is it" HMM
-    hmm2 = hmm(40, Dw2[:,:,0])
-    
-    # Train the "What time is it" HMM
-    hmm2.train(Dw2)
-    
-    
-    # Load "Play music" training data
-    Dw3 = loadWavData("PlayMusic", frameSize, skipSize, numCoef, numDataSets)
-    PlayMusicMfcc = Dw3[:,:,0]
-    
-    # Initialize the "Play music" HMM
-    hmm3 = hmm(40, Dw3[:,:,0])
-    
-    # Train the "Play music" HMM
-    hmm3.train(Dw3)
-    
-    
-    
-    """ Use the "Odessa" HMM """
-    probOdessa = []
-    probWhatTimeIsIt = []
-    probPlayMusic = []
-    
-    # Test with "Odessa"
-    probOdessa = hmm1.probEvidence(OdessaMfcc)
-    
-    # Test with "What time is it"
-    probWhatTimeIsIt = hmm1.probEvidence(WhatTimeIsItMfcc)
-    
-    # Test with "Play music"
-    probPlayMusic = hmm1.probEvidence(PlayMusicMfcc)
-    
-    print("p(Odessa | Odessa): ",probOdessa)
-    print("p(What time is it | Odessa): ",probWhatTimeIsIt)
-    print("p(Play music | Odessa): ",probPlayMusic)
-    print("")
-    
-    likelihoodArray = np.array([probOdessa,probWhatTimeIsIt,probPlayMusic])
-    
-    plt.figure()
-    plt.subplot(3,1,1)
-    plt.plot(likelihoodArray,'o')
-    plt.title('Odessa HMM')
-    
-    
-    """ Use the "What time is it" HMM """
-    probOdessa = []
-    probWhatTimeIsIt = []
-    probPlayMusic = []
-    
-    # Test with "Odessa"
-    probOdessa = hmm2.probEvidence(OdessaMfcc)
-    
-    # Test with "What time is it"
-    probWhatTimeIsIt = hmm2.probEvidence(WhatTimeIsItMfcc)
-    
-    # Test with "Play music"
-    probPlayMusic = hmm2.probEvidence(PlayMusicMfcc)
-    
-    print("p(Odessa | What time is it): ",probOdessa)
-    print("p(What time is it | What time is it): ",probWhatTimeIsIt)
-    print("p(Play music | What time is it): ",probPlayMusic)
-    print("")
-    
-    likelihoodArray = np.array([probOdessa,probWhatTimeIsIt,probPlayMusic])
-    
-    plt.subplot(3,1,2)
-    plt.plot(likelihoodArray,'o')
-    plt.title('What time is it HMM')
-    
-    
-    """ Use the "Play music" HMM """
-    probOdessa = []
-    probWhatTimeIsIt = []
-    probPlayMusic = []
-    
-    # Test with "Odessa"
-    probOdessa = hmm3.probEvidence(OdessaMfcc)
-    
-    # Test with "What time is it"
-    probWhatTimeIsIt = hmm3.probEvidence(WhatTimeIsItMfcc)
-    
-    # Test with "Play music"
-    probPlayMusic = hmm3.probEvidence(PlayMusicMfcc)
-    
-    print("p(Odessa | Play music): ",probOdessa)
-    print("p(What time is it | Play music): ",probWhatTimeIsIt)
-    print("p(Play music | Play music): ",probPlayMusic)
-    print("")
-    
-    likelihoodArray = np.array([probOdessa,probWhatTimeIsIt,probPlayMusic])
-
-    plt.subplot(3,1,3)
-    plt.plot(likelihoodArray,'o')
-    plt.title('Play music HMM')
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+            hmm._em_step(self, Dw)

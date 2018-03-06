@@ -12,7 +12,20 @@ class gmmhmm:
         
         #Normalize random initial state
         self.prior = self._normalize(self.random_state.rand(self.n_states, 1))
-        self.A = self._stochasticize(self.random_state.rand(self.n_states, self.n_states))
+        # Initialize transition matrix with random probabilities
+        self.A = np.zeros((self.n_states, self.n_states))
+        for i in range(0,self.n_states):
+            for j in range(0,self.n_states):
+                if j < i:
+                    self.A[i,j] = 0
+                elif i == self.n_states-1 and j == self.n_states-1:
+                    self.A[i,j] = 1
+                elif i == 0 and j == 0:
+                    self.A[i,j] = 0
+                elif j > i + 1:
+                    self.A[i,j] = 0
+                else:
+                    self.A[i,j] = np.random.rand()
         
         self.mu = None
         self.covs = None
@@ -118,6 +131,13 @@ class gmmhmm:
         #Ensure positive semidefinite by adding diagonal loading
         expected_covs += .01 * np.eye(self.n_dims)[:, :, None]
         
+        # Zero out elements in matrix A to make the state transitions only
+        # left to right
+        for i in range(0,self.n_states):
+            for j in range(0,self.n_states):
+                if j > i + 1 or j < i:
+                    self.A[i,j] = 0
+        
         self.prior = expected_prior
         self.mu = expected_mu
         self.covs = expected_covs
@@ -173,70 +193,78 @@ class gmmhmm:
         return p
 
 if __name__ == "__main__":
-    nIter = 15
-    nStates = 10
+    """ MFCC parameters """
+    frameSize = 25 # Length of the frame in milliseconds
+    skipSize  = 10 # Time difference in milliseconds between the start of one frame 
+                   # and the start of the next frame
+    numCoef   = 13 # Number of MFCC coefficients
     
-    # Load some training MFCC data
-    data1 = np.loadtxt('MFCC/TurnOnTheLights.csv',delimiter=',')
-    #data1 = data1[:,2:data1.shape[1]-2]
-    data1 = data1/np.max(data1)
+    ydim = 5
+    xdim = 5
     
-    m1 = gmmhmm(nStates)
-    m1.fit(data1, n_iter=nIter)
-    p1 = m1.hmm(data2)
-    print(sum(p1))
+    numDataSets   = 1 
     
-    # Load some training MFCC data
-    data2 = np.loadtxt('MFCC/WhatTimeIsIt.csv',delimiter=',')
-    #data2 = data2[:,2:data2.shape[1]-2]
-    data2 = data2/np.max(data2)
+    numStates = 5
     
-    m2 = gmmhmm(nStates)
-    m2.fit(data2, n_iter=nIter)
-    p2 = m2.hmm(data1)
-    print(sum(p2))
+    # Load "Odessa" training data
+    #Dw1 = loadWavData("odessa", frameSize, skipSize, numCoef, numDataSets)
+    #OdessaMfcc = Dw1[:,:,0]
+    np.random.seed(0)
+    Dw1 = np.random.rand(xdim, ydim)
     
-    m1t1 = m1.transform(data1)
-    m2t1 = m2.transform(data1)
-    print("Likelihoods for test set 1")
-    print("M1:", m1t1)
-    print("M2:", m2t1)
-    print("Prediction for test set 1")
-    print("Model", np.argmax([m1t1, m2t1]) + 1)
-    print()
+    # Initialize the "Odessa" HMM
+    hmm1 = gmmhmm(numStates)
     
-    m1t2 = m1.transform(data2)
-    m2t2 = m2.transform(data2)
-    print("Likelihoods for test set 2")
-    print("M1:", m1t2)
-    print("M2:", m2t2)
-    print("Prediction for test set 2")
-    print("Model", np.argmax([m1t2, m2t2]) + 1)
+    # Train the "Odessa" HMM
+    hmm1.fit(Dw1)
     
-#    rstate = np.random.RandomState(0)
-#    t1 = np.ones((26, 200)) + .001 * rstate.rand(26, 200)
-#    t1 /= t1.sum(axis=0)
-#    t2 = rstate.rand(*t1.shape)
-#    t2 /= t2.sum(axis=0)
-#    
-#    m1 = gmmhmm(2)
-#    m1.fit(t1)
-#    m2 = gmmhmm(2)
-#    m2.fit(t2)
-#    
-#    m1t1 = m1.transform(t1)
-#    m2t1 = m2.transform(t1)
-#    print("Likelihoods for test set 1")
-#    print("M1:", m1t1)
-#    print("M2:", m2t1)
-#    print("Prediction for test set 1")
-#    print("Model", np.argmax([m1t1, m2t1]) + 1)
-#    print()
-#    
-#    m1t2 = m1.transform(t2)
-#    m2t2 = m2.transform(t2)
-#    print("Likelihoods for test set 2")
-#    print("M1:", m1t2)
-#    print("M2:", m2t2)
-#    print("Prediction for test set 2")
-#    print("Model", np.argmax([m1t2, m2t2]) + 1)
+    
+    # Load "What time is it" training data
+    #Dw2 = loadWavData("WhatTimeIsIt", frameSize, skipSize, numCoef, numDataSets)
+    #WhatTimeIsItMfcc = Dw2[:,:,0]
+    np.random.seed(1)
+    Dw2 = np.random.rand(xdim, ydim)
+    
+    # Initialize the "What time is it" HMM
+    hmm2 = gmmhmm(numStates)
+    
+    # Train the "What time is it" HMM
+    hmm2.fit(Dw2)
+    
+    
+    # Load "Play music" training data
+    #Dw3 = loadWavData("PlayMusic", frameSize, skipSize, numCoef, numDataSets)
+    #PlayMusicMfcc = Dw3[:,:,0]
+    np.random.seed(3)
+    Dw3 = np.random.rand(xdim, ydim)
+    
+    # Initialize the "Play music" HMM
+    hmm3 = gmmhmm(numStates)
+    
+    # Train the "Play music" HMM
+    hmm3.fit(Dw3)
+    
+    
+    """ Test HMMs """
+    
+    mfccIn = Dw1
+    
+     # Test with "Odessa"
+    probOdessa = hmm1.transform(mfccIn)
+    
+    # Test with "What time is it"
+    probWhatTimeIsIt = hmm2.transform(mfccIn)
+    
+    # Test with "Play music"
+    probPlayMusic = hmm3.transform(mfccIn)
+    
+    print("p(Odessa | Odessa): ",probOdessa)
+    print("p(What time is it | Odessa): ",probWhatTimeIsIt)
+    print("p(Play music | Odessa): ",probPlayMusic)
+    print("")
+    
+    likelihoodArray = np.array([probOdessa,probWhatTimeIsIt,probPlayMusic])
+    
+    plt.figure()
+    plt.plot(likelihoodArray,'o')
+    plt.title('Odessa HMM')
