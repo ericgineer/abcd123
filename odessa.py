@@ -399,3 +399,4 @@ class hmm:
             print("Iteration number " + str(i))
             #hmm._em_step(self, Dw)
             hmm.em(self, Dw)
+            
