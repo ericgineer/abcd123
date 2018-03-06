@@ -110,7 +110,7 @@ class mfcc:
     def getMfcc(x, fs, frameSize, skipSize, numCoef):
         c = mfcc.mfcc(x, fs, frameSize, skipSize, numCoef)
         c = mfcc.deltaFeature(c, 2, numCoef)
-        return c
+        return c[:,2:-2]
 
 class hmm:
     """ A class to implement a HMM for speech recognition """
@@ -170,8 +170,9 @@ class hmm:
     """ Calculate the probability of evidence p(x_1:T) """
     def probEvidence(self, mfcc):
         p = hmm.stateLikelihood(self, mfcc)
-        alpha, beta, gamma, xi = hmm.recursion(self, p)
-        return np.sum(alpha * beta, axis=0)
+        alpha, beta, gamma, xi, logLikelihood = hmm.recursion(self, p)
+        #return np.sum(alpha * beta, axis=0)
+        return logLikelihood
 
 
     """ Expectation-Maximization (EM) algorithm initializiation function """
@@ -190,6 +191,7 @@ class hmm:
     
     """ Calculate the forward recursion, backward recursion, gamma, and xi """
     def recursion(self, p):
+        logLikelihood = 0
         T = p.shape[1]
         alpha = np.zeros(p.shape)
         beta = np.zeros(p.shape);
@@ -216,17 +218,18 @@ class hmm:
             for j in range(0,self.N):
                 xi[:,j,t] = p[:,t] * beta[:,t] * self.A[j,j] * alpha[:,t-1]
                 xi[:,j,t] /= np.sum(alpha[:,t]*beta[:,t])
+        logLikelihood = np.log(np.sum(np.sum(alpha*beta,axis=0)))
          
-        return alpha, beta, gamma, xi
+        return alpha, beta, gamma, xi, logLikelihood
     
     """ Expectation-Maximization algorithm """
     def em(self, Dw):
         w = Dw.shape[0]
         T = Dw.shape[1]
         pi = np.zeros((self.N,T))
-        for L in range(0, Dw.shape[2]):
+        for L in range(0, Dw.shape[2]):            
             p = hmm.stateLikelihood(self, Dw[:,:,L])
-            alpha, beta, gamma, xi = hmm.recursion(self, p)
+            alpha, beta, gamma, xi, logLikelihood = hmm.recursion(self, p)
             pi += 1/numDataSets * alpha[1,:] * beta[1,:] / np.sum(alpha[1,:] * beta[1,:])
             self.A[:,:] += np.sum(xi, axis=2) / np.sum(gamma,axis=1)
             
@@ -246,14 +249,26 @@ class hmm:
                             np.sum(gamma[q,:]))
     
     """ A function to train the HMM on a sequence of data """
-    def train(self, Dw):
+    def train(self, Dw):   
         hmm.emInit(self, Dw[:,:,0])
-        
         for i in range(0,15):
             print("Iteration number " + str(i))
             hmm.em(self, Dw)
             
-            
+def loadWavData(phrase, frameSize, skipSize, numCoef, numDataSets):
+    # Load some training wav files to get MFCC training data
+    FILENAME = "audio/" + phrase + "/" + phrase + "1.wav" # Name of wav file
+    fs, wavData = scipy.io.wavfile.read(FILENAME)    
+    mfccVect = mfcc.getMfcc(wavData, fs, frameSize, skipSize, numCoef)
+    Dw = np.zeros((mfccVect.shape[0],mfccVect.shape[1],numDataSets))
+    Dw[:,:,0] = mfccVect
+    for i in range(1,numDataSets+1):
+        FILENAME = "audio/" + phrase + "/" + phrase + str(i) + ".wav" # Name of wav file
+        print("Reading wave file " + FILENAME)
+        fs, wavData = scipy.io.wavfile.read(FILENAME)
+        mfccVect = mfcc.getMfcc(wavData, fs, frameSize, skipSize, numCoef)
+        Dw[:,:,i-1] = mfccVect
+    return Dw
         
 if __name__ == "__main__":
     """ MFCC parameters """
@@ -264,37 +279,45 @@ if __name__ == "__main__":
     
     numDataSets   = 10 
     
-    # Load some training wav files to get MFCC training data
-    FILENAME = "audio/odessa/odessa1.wav" # Name of wav file
-    fs, wavData = scipy.io.wavfile.read(FILENAME)    
-    mfccVect = mfcc.getMfcc(wavData, fs, frameSize, skipSize, numCoef)
-    OdessaMfcc = mfccVect
-    Dw = np.zeros((mfccVect.shape[0],mfccVect.shape[1],numDataSets))
-    Dw[:,:,0] = mfccVect
-    for i in range(1,numDataSets):
-        FILENAME = "audio/odessa/odessa" + str(i) + ".wav" # Name of wav file
-        print("Reading wave file " + FILENAME)
-        fs, wavData = scipy.io.wavfile.read(FILENAME)
-        mfccVect = mfcc.getMfcc(wavData, fs, frameSize, skipSize, numCoef)
-        Dw[:,:,i] = mfccVect
     
-#    mfccVect = mfcc.mfcc(wavData, fs, frameSize, skipSize, numCoef)
-#    
-#   
-    # Initialize HMM
-    hmm1 = hmm(30, mfccVect)
+    # Load "Odessa" training data
+    Dw1 = loadWavData("odessa", frameSize, skipSize, numCoef, numDataSets)
+    OdessaMfcc = Dw1[:,:,0]
     
-    # Train the HMM
-    hmm1.train(Dw)
+    # Initialize the "Odessa" HMM
+    hmm1 = hmm(6, Dw1[:,:,0])
     
-    # Load a test wave file
-    FILENAME = "audio/WhatTimeIsIt/WhatTimeIsIt1.wav" # Name of wav file
-    fs, wavData = scipy.io.wavfile.read(FILENAME)    
-    WhatTimeIsItMfcc = mfcc.getMfcc(wavData, fs, frameSize, skipSize, numCoef)
+    # Train the "Odessa" HMM
+    hmm1.train(Dw1)
     
-    FILENAME = "audio/PlayMusic/PlayMusic1.wav" # Name of wav file
-    fs, wavData = scipy.io.wavfile.read(FILENAME)    
-    PlayMusicMfcc = mfcc.getMfcc(wavData, fs, frameSize, skipSize, numCoef)
+    
+    # Load "What time is it" training data
+    Dw2 = loadWavData("WhatTimeIsIt", frameSize, skipSize, numCoef, numDataSets)
+    WhatTimeIsItMfcc = Dw2[:,:,0]
+    
+    # Initialize the "What time is it" HMM
+    hmm2 = hmm(40, Dw2[:,:,0])
+    
+    # Train the "What time is it" HMM
+    hmm2.train(Dw2)
+    
+    
+    # Load "Play music" training data
+    Dw3 = loadWavData("PlayMusic", frameSize, skipSize, numCoef, numDataSets)
+    PlayMusicMfcc = Dw3[:,:,0]
+    
+    # Initialize the "Play music" HMM
+    hmm3 = hmm(40, Dw3[:,:,0])
+    
+    # Train the "Play music" HMM
+    hmm3.train(Dw3)
+    
+    
+    
+    """ Use the "Odessa" HMM """
+    probOdessa = []
+    probWhatTimeIsIt = []
+    probPlayMusic = []
     
     # Test with "Odessa"
     probOdessa = hmm1.probEvidence(OdessaMfcc)
@@ -305,14 +328,69 @@ if __name__ == "__main__":
     # Test with "Play music"
     probPlayMusic = hmm1.probEvidence(PlayMusicMfcc)
     
-    print("Likelihood of Odessa: ",np.sum(probOdessa))
-    print("Likelihood of What time is it: ",np.sum(probWhatTimeIsIt))
-    print("Likelihood of Play music: ",np.sum(probPlayMusic))
+    print("p(Odessa | Odessa): ",probOdessa)
+    print("p(What time is it | Odessa): ",probWhatTimeIsIt)
+    print("p(Play music | Odessa): ",probPlayMusic)
+    print("")
+    
+    likelihoodArray = np.array([probOdessa,probWhatTimeIsIt,probPlayMusic])
+    
+    plt.figure()
+    plt.subplot(3,1,1)
+    plt.plot(likelihoodArray,'o')
+    plt.title('Odessa HMM')
     
     
+    """ Use the "What time is it" HMM """
+    probOdessa = []
+    probWhatTimeIsIt = []
+    probPlayMusic = []
+    
+    # Test with "Odessa"
+    probOdessa = hmm2.probEvidence(OdessaMfcc)
+    
+    # Test with "What time is it"
+    probWhatTimeIsIt = hmm2.probEvidence(WhatTimeIsItMfcc)
+    
+    # Test with "Play music"
+    probPlayMusic = hmm2.probEvidence(PlayMusicMfcc)
+    
+    print("p(Odessa | What time is it): ",probOdessa)
+    print("p(What time is it | What time is it): ",probWhatTimeIsIt)
+    print("p(Play music | What time is it): ",probPlayMusic)
+    print("")
+    
+    likelihoodArray = np.array([probOdessa,probWhatTimeIsIt,probPlayMusic])
+    
+    plt.subplot(3,1,2)
+    plt.plot(likelihoodArray,'o')
+    plt.title('What time is it HMM')
     
     
+    """ Use the "Play music" HMM """
+    probOdessa = []
+    probWhatTimeIsIt = []
+    probPlayMusic = []
     
+    # Test with "Odessa"
+    probOdessa = hmm3.probEvidence(OdessaMfcc)
+    
+    # Test with "What time is it"
+    probWhatTimeIsIt = hmm3.probEvidence(WhatTimeIsItMfcc)
+    
+    # Test with "Play music"
+    probPlayMusic = hmm3.probEvidence(PlayMusicMfcc)
+    
+    print("p(Odessa | Play music): ",probOdessa)
+    print("p(What time is it | Play music): ",probWhatTimeIsIt)
+    print("p(Play music | Play music): ",probPlayMusic)
+    print("")
+    
+    likelihoodArray = np.array([probOdessa,probWhatTimeIsIt,probPlayMusic])
+
+    plt.subplot(3,1,3)
+    plt.plot(likelihoodArray,'o')
+    plt.title('Play music HMM')
     
     
     
