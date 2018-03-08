@@ -143,6 +143,8 @@ class hmm:
         subset = self.randState.choice(np.arange(self.numCoef), size=self.Q, replace=True)
         self.mu = mfcc[:, subset]
         
+        self.prior = self.normalize(self.random_state.rand(self.Q, 1))
+        
         # Initialize covariance matrix
 #        self.C = np.zeros((self.numCoef, self.Q))
 #        for q in range(self.Q):
@@ -178,25 +180,25 @@ class hmm:
     """ Calculate the probability of evidence p(x_1:T) """
     def probEvidence(self, mfcc):
         B = hmm.pathWeights(self, mfcc)
-        logLikelihood = hmm.alphaRecursion(self, B)
+        alpha, logLikelihood = hmm.alphaRecursion(self, B)
         beta = hmm.betaRecursion(self, B)
         pEvidence = np.zeros(self.T)
         for t in range(self.T):
             for q in range(self.Q):
-                pEvidence[t] += self.alpha[q,t]*beta[q,t]
-        return pEvidence, self.alpha, beta, B, logLikelihood
+                pEvidence[t] += alpha[q,t]*beta[q,t]
+        return pEvidence,logLikelihood
 
    
     """ Calculate the forward recursion, backward recursion, gamma, and xi """
     def alphaRecursion(self, B):
         alpha = np.zeros((self.Q,self.T))
-        alpha[:,0] = np.random.rand(self.Q)
+        alpha[:,0] = self.alphaPrev #np.random.rand(self.Q)
         alpha[:,0] /= np.sum(alpha[:,0])
         for t in range(1,self.T):
             alpha[:,t] = B[:,t] * np.dot(self.A, alpha[:,t-1])
             logLikelihood = np.sum(alpha[:,t])
             alpha[:,t] /= np.sum(alpha[:,t])
-        return alpha, logLikelihood
+        return logLikelihood, alpha
     
     def betaRecursion(self, B):
         beta = np.zeros(B.shape)
@@ -205,6 +207,33 @@ class hmm:
             beta[:, t] = np.sum(beta[:, t + 1] * B[:, t + 1] * self.A,axis=1)
             beta[:, t] /= np.sum(beta[:, t])
         return beta
+    
+    def _forward(self, B):
+        log_likelihood = 0.
+        T = B.shape[1]
+        alpha = np.zeros(B.shape)
+        for t in range(T):
+            if t == 0:
+                alpha[:, t] = B[:, t] * self.prior.ravel()
+            else:
+                alpha[:, t] = B[:, t] * np.dot(self.A.T, alpha[:, t - 1])
+         
+            alpha_sum = np.sum(alpha[:, t])
+            alpha[:, t] /= alpha_sum
+            log_likelihood = log_likelihood + np.log(alpha_sum)
+        return log_likelihood, alpha
+    
+    def _backward(self, B):
+        T = B.shape[1]
+        beta = np.zeros(B.shape);
+           
+        beta[:, -1] = np.ones(B.shape[0])
+            
+        for t in range(T - 1)[::-1]:
+            beta[:, t] = np.dot(self.A, (B[:, t + 1] * beta[:, t + 1]))
+            beta[:, t] /= np.sum(beta[:, t])
+        return beta
+    
         
     def normalize(self, x):
         return (x + (x == 0)) / np.sum(x)
@@ -217,8 +246,11 @@ class hmm:
         B = hmm.pathWeights(self, x)    
         
         A = self.A
-        alpha, logLikelihood = hmm.alphaRecursion(self, B)
-        beta = hmm.betaRecursion(self, B)
+        #logLikelihood, alpha = hmm.alphaRecursion(self, B)
+        #beta = hmm.betaRecursion(self, B)
+        logLikelihood, alpha = hmm._forward(self, B)
+        beta = hmm._backward(self, B)
+        
         
         # Calculate gamma
         gamma = np.zeros((self.Q, self.T))
@@ -228,6 +260,7 @@ class hmm:
                 for qq in range(self.Q):
                     gammaSum += alpha[qq,t] * beta[qq,t]
                 gamma[q,t] = alpha[q,t]*beta[q,t] / gammaSum
+            gamma[:,t] = hmm.normalize(self, gamma[:,t])
         
         # Calculate xi
         pEvidence = np.zeros(self.T)
@@ -236,9 +269,11 @@ class hmm:
                 pEvidence[t] += alpha[q,t]*beta[q,t]
         
         xi = np.zeros((self.Q,self.Q,self.T))
-        xi[:,:,0] = np.dot(self.alphaPrev, (beta[:,t] * B[:,t]).T) * A
+        xi[:,:,0] = np.dot(self.alphaPrev, (beta[:,t] * B[:,t]).T) * A / pEvidence[0]
+        xi[:,:,0] = hmm.normalize(self, xi[:,:,0])
         for t in range(1,self.T):
             xi[:,:,t] = np.dot(alpha[:,t-1], (beta[:,t] * B[:,t]).T) * A / pEvidence[t]
+            xi[:,:,t] = hmm.normalize(self, xi[:,:,t])
             
         # Update A
         for i in range(self.Q):
@@ -249,6 +284,18 @@ class hmm:
                     numA += xi[i,j,t]
                     denA += gamma[i,t]
                 A[i,j] = numA/denA
+        
+        # Zero out un-needed A elements
+        for i in range(0,self.Q):
+            for j in range(0,self.Q):
+                if j < i:
+                    A[i,j] = 0
+                elif i == 0 and j == 0:
+                    A[i,j] = 0
+                elif j > i + 1:
+                    A[i,j] = 0
+
+                
                     
         # Update mu
         mu = np.zeros((self.numCoef,self.Q))

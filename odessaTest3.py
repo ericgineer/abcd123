@@ -34,36 +34,64 @@ if __name__ == "__main__":
     
     numDataSets   = 1 
     
-    ydim = 5
-    xdim = 5
+    ydim = 10
+    xdim = 10
     
     numDataSets   = 1 
     
-    numStates = 5
+    numStates = 10
     
-    numIter = 5 # number of EM algorithm iterations
+    numIter = 10 # number of EM algorithm iterations
+    
+    
+    """ HMM 1 """
     
     # Load "Odessa" training data
     #Dw1 = loadWavData("odessa", frameSize, skipSize, numCoef, numDataSets)
     #OdessaMfcc = Dw1[:,:,0]
     np.random.seed(0)
-    Dw1 = np.random.rand(xdim, ydim)
+    d1 = np.random.rand(xdim, ydim)
     
     # Initialize the "Odessa" HMM
-    hmm1 = odessa2.hmm(numStates, Dw1)
+    hmm1 = odessa2.hmm(numStates, d1)
     
     # Train the "Odessa" HMM
-    conv = hmm1.train(Dw1, numIter)
+    conv1 = hmm1.train(d1, numIter)
     
-    plt.figure()
-    plt.plot(conv)
-    plt.title('EM algorithm convergence')
+    """ HMM 1 """
     
-    alpha = hmm1.alpha
-    beta  = hmm1.beta
-    gamma = hmm1.gamma
-    xi    = hmm1.xi
-    A     = hmm1.A
-    mu    = hmm1.mu
-    C     = hmm1.C
+    # Load "Odessa" training data
+    #Dw1 = loadWavData("odessa", frameSize, skipSize, numCoef, numDataSets)
+    #OdessaMfcc = Dw1[:,:,0]
+    np.random.seed(0)
+    d2 = np.random.rand(xdim, ydim)
+    
+    # Initialize the "Odessa" HMM
+    hmm2 = odessa2.hmm(numStates, d2)
+    
+    # Train the "Odessa" HMM
+    conv2 = hmm2.train(d2, numIter)
+    
+    
+    data = d1
+    
+    prob1, ll1 = hmm1.probEvidence(data)
+    prob2, ll2 = hmm2.probEvidence(data)
+    
+    print("hmm1: ",ll1)
+    print("hmm2: ",ll2)
+    
+    
+    
+#    plt.figure()
+#    plt.plot(conv)
+#    plt.title('EM algorithm convergence')
+#    
+#    alpha = hmm1.alpha
+#    beta  = hmm1.beta
+#    gamma = hmm1.gamma
+#    xi    = hmm1.xi
+#    A     = hmm1.A
+#    mu    = hmm1.mu
+#    C     = hmm1.C
     
