@@ -205,7 +205,7 @@ class hmm:
         logLikelihood = 0.
         T = B.shape[1]
         alpha = np.zeros(B.shape)
-        beta = np.zeros(B.shape);
+        beta = np.zeros(B.shape)
         gamma = np.zeros(B.shape)
         xi = np.zeros((self.N,self.N))
         
@@ -277,15 +277,15 @@ class hmm:
             else:
                 p = hmm.stateLikelihood(self, Dw)
             alpha, beta, gamma, xi, logLikelihood = hmm.recursion(self, p)
-            #self.A = xi / np.sum(gamma,axis=0)
-            self.A = hmm._stochasticize(self, xi)
+            self.A = np.sum(xi) / np.sum(gamma,axis=0)
+            #self.A = hmm._stochasticize(self, xi)
             
-#            # Zero out elements in matrix A to make the state transitions only
-#            # left to right
-#            for i in range(0,self.N):
-#                for j in range(0,self.N):
-#                    if j > i + 1 or j < i:
-#                        self.A[i,j] = 0
+            # Zero out elements in matrix A to make the state transitions only
+            # left to right
+            for i in range(0,self.N):
+                for j in range(0,self.N):
+                    if j > i + 1 or j < i:
+                        self.A[i,j] = 0
             
 #            for q in range(0,self.N): # iterate over the number of states
 #                if np.array(Dw.shape).size > 2:
@@ -305,7 +305,10 @@ class hmm:
             
             gamma_state_sum = np.sum(gamma, axis=1)
             for q in range(self.N):
-                gamma_obs = Dw * gamma[q, :]
+                if np.array(Dw.shape).size > 2:
+                    gamma_obs = Dw[:,:,L] * gamma[q, :]
+                else:
+                    gamma_obs = Dw * gamma[q, :]
                 self.mu[:, q] = np.sum(gamma_obs, axis=1) / gamma_state_sum[q]
                 #self.C = np.dot(gamma_obs, Dw.T) / gamma_state_sum[q] - np.dot(self.mu[:, q], self.mu[:, q].T)
                 #Symmetrize

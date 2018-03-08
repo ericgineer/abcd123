@@ -29,64 +29,59 @@ if __name__ == "__main__":
                    # and the start of the next frame
     numCoef   = 13 # Number of MFCC coefficients
     
-    ydim = 10
-    xdim = 5
+    numDataSets   = 10 
     
-    numDataSets   = 1 
-    
-    numStates = 5
+    numStates = 10
     
     # Load "Odessa" training data
-    #Dw1 = loadWavData("odessa", frameSize, skipSize, numCoef, numDataSets)
-    #OdessaMfcc = Dw1[:,:,0]
-    np.random.seed(0)
-    Dw1 = np.random.rand(xdim, ydim)
+    Dw1 = loadWavData("odessa", frameSize, skipSize, numCoef, numDataSets)
+    OdessaMfcc = Dw1[:,:,0]
     
     # Initialize the "Odessa" HMM
-    hmm1 = odessa.hmm(numStates, Dw1)
+    hmm1 = odessa.hmm(numStates, Dw1[:,:,0])
     
     # Train the "Odessa" HMM
     hmm1.train(Dw1)
     
     
     # Load "What time is it" training data
-    #Dw2 = loadWavData("WhatTimeIsIt", frameSize, skipSize, numCoef, numDataSets)
-    #WhatTimeIsItMfcc = Dw2[:,:,0]
-    np.random.seed(1)
-    Dw2 = np.random.rand(xdim, ydim)
+    Dw2 = loadWavData("WhatTimeIsIt", frameSize, skipSize, numCoef, numDataSets)
+    WhatTimeIsItMfcc = Dw2[:,:,0]
     
     # Initialize the "What time is it" HMM
-    hmm2 = odessa.hmm(numStates, Dw2)
+    hmm2 = odessa.hmm(numStates, Dw2[:,:,0])
     
     # Train the "What time is it" HMM
     hmm2.train(Dw2)
     
     
     # Load "Play music" training data
-    #Dw3 = loadWavData("PlayMusic", frameSize, skipSize, numCoef, numDataSets)
-    #PlayMusicMfcc = Dw3[:,:,0]
-    np.random.seed(3)
-    Dw3 = np.random.rand(xdim, ydim)
+    Dw3 = loadWavData("PlayMusic", frameSize, skipSize, numCoef, numDataSets)
+    PlayMusicMfcc = Dw3[:,:,0]
     
     # Initialize the "Play music" HMM
-    hmm3 = odessa.hmm(numStates, Dw3)
+    hmm3 = odessa.hmm(numStates, Dw3[:,:,0])
     
     # Train the "Play music" HMM
     hmm3.train(Dw3)
     
     
+    
     """ Test HMMs """
+    probOdessa = []
+    probWhatTimeIsIt = []
+    probPlayMusic = []
     
-    mfccIn = Dw1
+    inputMfcc = WhatTimeIsItMfcc
     
-     # Test with "Odessa"
-    probOdessa = hmm1.probEvidence(mfccIn)
+    # Test with "Odessa"
+    probOdessa = hmm1.probEvidence(inputMfcc)
     
     # Test with "What time is it"
-    probWhatTimeIsIt = hmm2.probEvidence(mfccIn)
+    probWhatTimeIsIt = hmm2.probEvidence(inputMfcc)
     
     # Test with "Play music"
-    probPlayMusic = hmm3.probEvidence(mfccIn)
+    probPlayMusic = hmm3.probEvidence(inputMfcc)
     
     print("p(Odessa | Odessa): ",probOdessa)
     print("p(What time is it | Odessa): ",probWhatTimeIsIt)
@@ -95,20 +90,8 @@ if __name__ == "__main__":
     
     likelihoodArray = np.array([probOdessa,probWhatTimeIsIt,probPlayMusic])
     
+    xaxis = np.array([1,2,3])
+    
     plt.figure()
-    plt.plot(likelihoodArray,'o')
-    plt.title('Odessa HMM')
-    
-    B = hmm3.stateLikelihood(Dw3)
-    logLikelihood1, a1 = hmm3._forward(B)
-    b1 = hmm3._backward(B)
-    
-    gamma1 = hmm3.testGamma
-    xi1 = hmm3.testXi
-    
-    a2, b2, gamma2, xi2, logLikelihood2 = hmm3.recursion(B)
-    
-    A = hmm3.A
-    mu = hmm3.mu
-    C = hmm3.C
-    cov = hmm3.covs
+    plt.plot(xaxis,likelihoodArray,'ro')
+    plt.title('HMM')
