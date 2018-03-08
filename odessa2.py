@@ -113,6 +113,7 @@ class mfcc:
 class hmm:
     """ A class to implement a HMM for speech recognition """
     def __init__(self, numStates, mfcc):
+        self.random_state = np.random.RandomState(0)
         
         """ Initialize HMM variables """
         self.Q = numStates  # Number of states to use in the HMM
@@ -137,6 +138,7 @@ class hmm:
                     self.A[i,j] = np.random.rand()
         
         # Initialize mu
+        self.mu = np.zeros((self.numCoef,self.Q))
         self.randState = np.random.RandomState(0)
         subset = self.randState.choice(np.arange(self.numCoef), size=self.Q, replace=True)
         self.mu = mfcc[:, subset]
@@ -152,7 +154,16 @@ class hmm:
         # Initialize the state likelihoood matrix p(x_t | Q_t = q)
         self.B = np.zeros((self.Q, mfcc.shape[1]))
         
+        self.alphaPrev = np.random.rand(self.Q)
+        self.alphaPrev /= np.sum(self.alphaPrev)
         self.alpha = np.zeros((self.Q,self.T))
+        
+        
+        self.beta = np.zeros((self.Q,self.T))
+        
+        self.gamma = np.zeros((self.Q, self.T))
+        
+        self.xi = np.zeros((self.Q,self.Q,self.T))
 
     """ Function to calculate the path weight matrix p(x_t | Q_t = q) """
     def pathWeights(self, x):
@@ -178,57 +189,107 @@ class hmm:
    
     """ Calculate the forward recursion, backward recursion, gamma, and xi """
     def alphaRecursion(self, B):
-        self.alpha[:,0] = np.random.rand(self.Q)
-        self.alpha[:,0] /= np.sum(self.alpha[:,0])
+        alpha = np.zeros((self.Q,self.T))
+        alpha[:,0] = np.random.rand(self.Q)
+        alpha[:,0] /= np.sum(alpha[:,0])
         for t in range(1,self.T):
-            self.alpha[:,t] = B[:,t] * np.dot(self.A, self.alpha[:,t-1])
-            logLikelihood = np.sum(self.alpha[:,t])
-            self.alpha[:,t] /= np.sum(self.alpha[:,t])
-        return logLikelihood
+            alpha[:,t] = B[:,t] * np.dot(self.A, alpha[:,t-1])
+            logLikelihood = np.sum(alpha[:,t])
+            alpha[:,t] /= np.sum(alpha[:,t])
+        return alpha, logLikelihood
     
     def betaRecursion(self, B):
-        beta = np.zeros(B.shape);
+        beta = np.zeros(B.shape)
         beta[:, self.T-1] = np.ones(self.Q)
         for t in range(self.T-2,-1,-1):
             beta[:, t] = np.sum(beta[:, t + 1] * B[:, t + 1] * self.A,axis=1)
             beta[:, t] /= np.sum(beta[:, t])
         return beta
         
-
+    def normalize(self, x):
+        return (x + (x == 0)) / np.sum(x)
+    
+    def stochasticize(self, x):
+        return (x + (x == 0)) / np.sum(x, axis=1)
     
     """ Expectation-Maximization algorithm """
-    def em(self, Dw):        
-        B = hmm.pathWeights(self, Dw)
+    def em(self, x):        
+        B = hmm.pathWeights(self, x)    
         
-        alphaPrev = self.alpha
-        logLikelihood = hmm.alphaRecursion(self, B)
+        A = self.A
+        alpha, logLikelihood = hmm.alphaRecursion(self, B)
         beta = hmm.betaRecursion(self, B)
         
         # Calculate gamma
-        gamma = np.zeros(B.shape)
+        gamma = np.zeros((self.Q, self.T))
         for t in range(self.T):
             for q in range(self.Q):
-                gamma[q,t] = self.alpha[q,t]*beta[q,t] / np.sum(self.alpha[:,t] * beta[:,t])
+                gammaSum = 0
+                for qq in range(self.Q):
+                    gammaSum += alpha[qq,t] * beta[qq,t]
+                gamma[q,t] = alpha[q,t]*beta[q,t] / gammaSum
         
         # Calculate xi
-        xi = np.zeros((self.Q,self.Q,self.T))
-        xi[:,:,0] = np.dot(alphaPrev[:,t-1], (beta[:,t] * B[:,t]).T) * self.A
-        for t in range(1,self.T):
-            xi[:,:,t] = np.dot(self.alpha[:,t-1], (beta[:,t] * B[:,t]).T) * self.A
+        pEvidence = np.zeros(self.T)
+        for t in range(self.T):
+            for q in range(self.Q):
+                pEvidence[t] += alpha[q,t]*beta[q,t]
         
-        return gamma, xi, logLikelihood
+        xi = np.zeros((self.Q,self.Q,self.T))
+        xi[:,:,0] = np.dot(self.alphaPrev, (beta[:,t] * B[:,t]).T) * A
+        for t in range(1,self.T):
+            xi[:,:,t] = np.dot(alpha[:,t-1], (beta[:,t] * B[:,t]).T) * A / pEvidence[t]
+            
+        # Update A
+        for i in range(self.Q):
+            for j in range(self.Q):
+                numA = 0
+                denA = 0
+                for t in range(self.T):
+                    numA += xi[i,j,t]
+                    denA += gamma[i,t]
+                A[i,j] = numA/denA
+                    
+        # Update mu
+        mu = np.zeros((self.numCoef,self.Q))
+        for q in range(self.Q):
+            numMu = 0
+            denMu = 0
+            for t in range(self.T):
+                numMu += x[:,t] *  gamma[q,t]
+                denMu += gamma[q,t]
+            mu[:,q] = numMu / denMu
+            
+        # Update C
+        C = np.zeros((self.numCoef, self.numCoef, self.Q))
+        for q in range(self.Q):
+            numC = 0
+            denC = 0
+            for t in range(self.T):
+                numC += (x[:,t]-mu[:,q]) * (x[:,t]-mu[:,q]) * gamma[q,t]
+                denC += gamma[q,t]
+            for c in range(self.numCoef):
+                C[c,c,q] = numC[c] / denC
+                
+        # Update state variables
+        self.alpha = alpha
+        self.beta  = beta
+        self.gamma = gamma
+        self.xi   = xi
+        self.A     = A
+        self.mu    = mu
+        self.C     = C
+        
+        return logLikelihood
     
     
                 
    
     
-#    """ A function to train the HMM on a sequence of data """
-#    def train(self, Dw):
-#        if np.array(Dw.shape).size > 2:
-#            hmm.emInit(self, Dw[:,:,0])
-#        else:
-#            hmm.emInit(self, Dw)
-#        for i in range(0,15):
-#            print("Iteration number " + str(i))
-#            #hmm._em_step(self, Dw)
-#            hmm.em(self, Dw)
+    """ A function to train the HMM on a sequence of data """
+    def train(self, Dw, numIter):
+        conv = np.zeros(numIter)
+        for i in range(0,numIter):
+            conv[i] = hmm.em(self, Dw)
+        return conv
+            
