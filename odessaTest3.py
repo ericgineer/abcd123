@@ -34,14 +34,14 @@ if __name__ == "__main__":
     
     numDataSets   = 1 
     
-    ydim = 10
-    xdim = 10
+    ydim = 5
+    xdim = 5
     
     numDataSets   = 1 
     
     numStates = 10
     
-    numIter = 10 # number of EM algorithm iterations
+    numIter = 2 # number of EM algorithm iterations
     
     
     """ HMM 1 """
@@ -63,7 +63,6 @@ if __name__ == "__main__":
     # Load "Odessa" training data
     #Dw1 = loadWavData("odessa", frameSize, skipSize, numCoef, numDataSets)
     #OdessaMfcc = Dw1[:,:,0]
-    np.random.seed(0)
     d2 = np.random.rand(xdim, ydim)
     
     # Initialize the "Odessa" HMM

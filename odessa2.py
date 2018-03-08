@@ -175,12 +175,19 @@ class hmm:
                 for c in range(self.numCoef):
                     exponent += (x[c,t]-self.mu[c,q]) * 1/self.C[c,c,q] * (x[c,t]-self.mu[c,q])
                 self.B[q,t] = 1/np.sqrt(np.linalg.det(2*np.pi*self.C[:,:,q]))*np.exp(-1/2 * exponent)
+                
+#        x = np.atleast_2d(x)
+#        for s in range(self.Q):
+#            #Needs scipy 0.14
+#            np.random.seed(self.random_state.randint(1))
+#            self.B[s, :] = st.multivariate_normal.pdf(
+#                x.T, mean=self.mu[:, s].T, cov=self.C[:, :, s].T)
         return self.B
     
     """ Calculate the probability of evidence p(x_1:T) """
     def probEvidence(self, mfcc):
         B = hmm.pathWeights(self, mfcc)
-        alpha, logLikelihood = hmm.alphaRecursion(self, B)
+        logLikelihood, alpha = hmm.alphaRecursion(self, B)
         beta = hmm.betaRecursion(self, B)
         pEvidence = np.zeros(self.T)
         for t in range(self.T):
@@ -246,10 +253,10 @@ class hmm:
         B = hmm.pathWeights(self, x)    
         
         A = self.A
-        #logLikelihood, alpha = hmm.alphaRecursion(self, B)
-        #beta = hmm.betaRecursion(self, B)
-        logLikelihood, alpha = hmm._forward(self, B)
-        beta = hmm._backward(self, B)
+        logLikelihood, alpha = hmm.alphaRecursion(self, B)
+        beta = hmm.betaRecursion(self, B)
+        #logLikelihood, alpha = hmm._forward(self, B)
+        #beta = hmm._backward(self, B)
         
         
         # Calculate gamma
@@ -260,7 +267,7 @@ class hmm:
                 for qq in range(self.Q):
                     gammaSum += alpha[qq,t] * beta[qq,t]
                 gamma[q,t] = alpha[q,t]*beta[q,t] / gammaSum
-            gamma[:,t] = hmm.normalize(self, gamma[:,t])
+            #gamma[:,t] = hmm.normalize(self, gamma[:,t])
         
         # Calculate xi
         pEvidence = np.zeros(self.T)
@@ -273,7 +280,7 @@ class hmm:
         xi[:,:,0] = hmm.normalize(self, xi[:,:,0])
         for t in range(1,self.T):
             xi[:,:,t] = np.dot(alpha[:,t-1], (beta[:,t] * B[:,t]).T) * A / pEvidence[t]
-            xi[:,:,t] = hmm.normalize(self, xi[:,:,t])
+            #xi[:,:,t] = hmm.normalize(self, xi[:,:,t])
             
         # Update A
         for i in range(self.Q):
