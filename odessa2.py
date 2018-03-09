@@ -113,8 +113,6 @@ class mfcc:
 class hmm:
     """ A class to implement a HMM for speech recognition """
     def __init__(self, numStates, mfcc):
-        self.random_state = np.random.RandomState(0)
-        
         """ Initialize HMM variables """
         self.Q = numStates  # Number of states to use in the HMM
                             # (should be the number of phonenems in the phrase)
@@ -122,44 +120,24 @@ class hmm:
         self.numCoef = mfcc.shape[0] # Number of MFCC coefficients
         self.T       = mfcc.shape[1] # Number of MFCC vectors
         
-        # Initialize transition matrix with random probabilities
-#        self.A = np.zeros((self.Q, self.Q))
-#        for i in range(0,self.Q):
-#            for j in range(0,self.Q):
-#                if j < i:
-#                    self.A[i,j] = 0
-#                elif i == self.Q-1 and j == self.Q-1:
-#                    self.A[i,j] = 1
-#                elif i == 0 and j == 0:
-#                    self.A[i,j] = 0
-#                elif j > i + 1:
-#                    self.A[i,j] = 0
-#                else:
-#                    self.A[i,j] = np.random.rand()
-        self.A = self.stochasticize(self.random_state.rand(self.Q, self.Q))
+        self.randState = np.random.RandomState(0)
+        
+        self.A = self.stochasticize(self.randState.rand(self.Q, self.Q))
         
         self.xiSum = np.zeros((self.Q,self.Q))
         
         # Initialize mu
         self.mu = np.zeros((self.numCoef,self.Q))
-        self.randState = np.random.RandomState(0)
         subset = self.randState.choice(np.arange(self.numCoef), size=self.Q, replace=True)
         self.mu = mfcc[:, subset]
         
-        self.prior = self.normalize(self.random_state.rand(self.Q, 1))
-        
-        # Initialize covariance matrix
-#        self.C = np.zeros((self.numCoef, self.Q))
-#        for q in range(self.Q):
-#            for c in range(self.numCoef):
-#                self.C[c,q] = np.mean(mfcc[c,:])/np.max(np.abs(mfcc[c,:])) + 0.01 * np.random.rand()
         self.C = np.zeros((self.numCoef, self.numCoef, self.Q))
         self.C += np.diag(np.diag(np.cov(mfcc)))[:, :, None]
         
         # Initialize the state likelihoood matrix p(x_t | Q_t = q)
-        self.B = np.zeros((self.Q, mfcc.shape[1]))
+        self.B = np.zeros((self.Q, self.T))
         
-        self.alphaPrev = np.random.rand(self.Q)
+        self.alphaPrev = self.randState.rand(self.Q)
         self.alphaPrev /= np.sum(self.alphaPrev)
         self.alpha = np.zeros((self.Q,self.T))
         
@@ -196,17 +174,18 @@ class hmm:
         for t in range(self.T):
             for q in range(self.Q):
                 pEvidence[t] += alpha[q,t]*beta[q,t]
-        return pEvidence,logLikelihood
+        return pEvidence,logLikelihood, alpha, B
 
    
     """ Calculate the forward recursion, backward recursion, gamma, and xi """
     def alphaRecursion(self, B):
         alpha = np.zeros((self.Q,self.T))
-        alpha[:,0] = self.alphaPrev #np.random.rand(self.Q)
+        alpha[:,0] = B[:,0] * self.alphaPrev
+        logLikelihood = np.log(np.sum(alpha[:,0]))
         alpha[:,0] /= np.sum(alpha[:,0])
         for t in range(1,self.T):
-            alpha[:,t] = B[:,t] * np.dot(self.A, alpha[:,t-1])
-            logLikelihood = np.sum(alpha[:,t])
+            alpha[:,t] = B[:,t] * np.dot(self.A.T, alpha[:,t-1])
+            logLikelihood += np.log(np.sum(alpha[:,t]))
             alpha[:,t] /= np.sum(alpha[:,t])
         return logLikelihood, alpha
     
@@ -217,6 +196,32 @@ class hmm:
             beta[:, t] = np.sum(beta[:, t + 1] * B[:, t + 1] * self.A,axis=1)
             beta[:, t] /= np.sum(beta[:, t])
         return beta
+    
+    def _forward(self, B):
+        log_likelihood = 0.
+        T = B.shape[1]
+        alpha = np.zeros(B.shape)
+        for t in range(T):
+            if t == 0:
+                alpha[:, t] = B[:, t] * self.alphaPrev
+            else:
+                alpha[:, t] = B[:, t] * np.dot(self.A.T, alpha[:, t - 1])
+         
+            alpha_sum = np.sum(alpha[:, t])
+            alpha[:, t] /= alpha_sum
+            log_likelihood = log_likelihood + np.log(alpha_sum)
+        return log_likelihood, alpha
+    
+    def _backward(self, B):
+        T = B.shape[1]
+        beta = np.zeros(B.shape);
+           
+        beta[:, -1] = np.ones(B.shape[0])
+            
+        for t in range(T - 1)[::-1]:
+            beta[:, t] = np.dot(self.A, (B[:, t + 1] * beta[:, t + 1]))
+            beta[:, t] /= np.sum(beta[:, t])
+        return beta
         
     def normalize(self, x):
         return (x + (x == 0)) / np.sum(x)
@@ -225,13 +230,14 @@ class hmm:
         return (x + (x == 0)) / np.sum(x, axis=1)
     
     def emInit(self, x):
-        self.A = self.stochasticize(self.random_state.rand(self.Q, self.Q))
+        self.randState = np.random.RandomState(0)
+        
+        self.A = self.stochasticize(self.randState.rand(self.Q, self.Q))
         
         self.xiSum = np.zeros((self.Q,self.Q))
         
         # Initialize mu
         self.mu = np.zeros((self.numCoef,self.Q))
-        self.randState = np.random.RandomState(0)
         subset = self.randState.choice(np.arange(self.numCoef), size=self.Q, replace=True)
         self.mu = x[:, subset]
         
@@ -241,7 +247,7 @@ class hmm:
         # Initialize the state likelihoood matrix p(x_t | Q_t = q)
         self.B = np.zeros((self.Q, self.T))
         
-        self.alphaPrev = np.random.rand(self.Q)
+        self.alphaPrev = self.randState.rand(self.Q)
         self.alphaPrev /= np.sum(self.alphaPrev)
         self.alpha = np.zeros((self.Q,self.T))
         
@@ -263,6 +269,8 @@ class hmm:
         #logLikelihood, alpha = hmm._forward(self, B)
         #beta = hmm._backward(self, B)
         
+        #logLikelihood, alpha = hmm._forward(self, B)
+        #beta = hmm.betaRecursion(self, B)
         
         # Calculate gamma
         gamma = np.zeros((self.Q, self.T))
@@ -320,7 +328,7 @@ class hmm:
             for t in range(self.T):
                 numMu += x[:,t] *  gamma[q,t]
                 denMu += gamma[q,t]
-            mu[:,q] = numMu / denMu + 0.01 * np.random.rand(self.numCoef)
+            mu[:,q] = numMu / denMu # + 0.01 * np.random.rand(self.numCoef)
             
         # Update C
         C = np.zeros((self.numCoef, self.numCoef, self.Q))
@@ -333,9 +341,10 @@ class hmm:
             for c in range(self.numCoef):
                 C[c,c,q] = numC[c] / denC
                 
-        #expected_covs = np.zeros((self.numCoef, self.numCoef, self.Q))
-        #expected_covs += .01 * np.eye(self.numCoef)[:, :, None]
-        C += .01 * np.eye(self.numCoef)[:, :, None]
+        expected_covs = np.zeros((self.numCoef, self.numCoef, self.Q))
+        expected_covs += .01 * np.eye(self.numCoef)[:, :, None]
+        for q in range(self.Q):
+            C[:,:,q] += .01 * np.eye(self.numCoef)
                 
         # Update state variables
         self.alpha = alpha

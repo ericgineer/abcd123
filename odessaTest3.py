@@ -85,18 +85,18 @@ if __name__ == "__main__":
     numIter = 15
     
     rstate = np.random.RandomState(0)
-    t1 = np.ones((4, 40)) + .001 * rstate.rand(4, 40)
+    t1 = np.ones((4, 40)) + .01 * rstate.rand(4, 40)
     t1 /= t1.sum(axis=0)
     t2 = rstate.rand(*t1.shape)
     t2 /= t2.sum(axis=0)
     
-    m1 = odessa2.hmm(numStates, t1)
+    m1 = odessa2.hmm(numStates, t1)   
     conv1 = m1.train(t1, numIter)
     m2 = odessa2.hmm(numStates, t2)
     conv2 = m2.train(t2, numIter)
     
-    p11, m1t1 = m1.probEvidence(t1)
-    p21, m2t1 = m2.probEvidence(t1)
+    p11, m1t1, alpha11, B11 = m1.probEvidence(t1)
+    p21, m2t1, alpha21, B21 = m2.probEvidence(t1)
     print("Likelihoods for test set 1")
     print("M1:", m1t1)
     print("M2:", m2t1)
@@ -104,8 +104,8 @@ if __name__ == "__main__":
     print("Model", np.argmax([m1t1, m2t1]) + 1)
     print()
     
-    p12, m1t2 = m1.probEvidence(t2)
-    p22, m2t2 = m2.probEvidence(t2)
+    p12, m1t2, alpha12, B12 = m1.probEvidence(t2)
+    p22, m2t2, alpha22, B22 = m2.probEvidence(t2)
     print("Likelihoods for test set 2")
     print("M1:", m1t2)
     print("M2:", m2t2)
@@ -117,15 +117,24 @@ if __name__ == "__main__":
     plt.title('HMM1 convergence')
     
     plt.figure()
-    plt.plot(conv2)
+    plt.plot(conv2[1:conv2.size])
     plt.title('HMM2 convergence')
     
-    alpha = m1.alpha
-    beta  = m1.beta
-    gamma = m1.gamma
-    xi    = m1.xi
-    A     = m1.A
-    mu    = m1.mu
-    C     = m1.C
-    xiSum = m1.xiSum
+    alpha1 = m1.alpha
+    beta1  = m1.beta
+    gamma1 = m1.gamma
+    xi1    = m1.xi
+    A1     = m1.A
+    mu1    = m1.mu
+    C1     = m1.C
+    xiSum1 = m1.xiSum
+    
+    alpha2 = m2.alpha
+    beta2  = m2.beta
+    gamma2 = m2.gamma
+    xi2    = m2.xi
+    A2     = m2.A
+    mu2    = m2.mu
+    C2     = m2.C
+    xiSum2 = m2.xiSum
     
