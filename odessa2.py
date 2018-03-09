@@ -112,7 +112,7 @@ class mfcc:
 
 class hmm:
     """ A class to implement a HMM for speech recognition """
-    def __init__(self, numStates, mfcc):
+    def __init__(self, numStates, mfcc, leftToRight):
         """ Initialize HMM variables """
         self.Q = numStates  # Number of states to use in the HMM
                             # (should be the number of phonenems in the phrase)
@@ -122,7 +122,29 @@ class hmm:
         
         self.randState = np.random.RandomState(0)
         
-        self.A = self.stochasticize(self.randState.rand(self.Q, self.Q))
+        self.leftToRight = leftToRight
+        
+        #self.A = self.stochasticize(self.randState.rand(self.Q, self.Q))
+        
+        # Initialize transition matrix with random probabilities
+        if self.leftToRight == 1:
+            self.A = np.zeros((self.Q, self.Q))
+            for i in range(0,self.Q):
+                for j in range(0,self.Q):
+                    if j < i:
+                        self.A[i,j] = 0
+                    elif i == self.Q-1 and j == self.Q-1:
+                        self.A[i,j] = 1
+                    elif i == 0 and j == 0:
+                        self.A[i,j] = 0
+                    elif j > i + 1:
+                        self.A[i,j] = 0
+                    else:
+                        self.A[i,j] = np.random.rand()
+        else:
+            self.A = self.randState.rand(self.Q,self.Q)
+            
+            
         
         self.xiSum = np.zeros((self.Q,self.Q))
         
@@ -184,7 +206,7 @@ class hmm:
         logLikelihood = np.log(np.sum(alpha[:,0]))
         alpha[:,0] /= np.sum(alpha[:,0])
         for t in range(1,self.T):
-            alpha[:,t] = B[:,t] * np.dot(self.A.T, alpha[:,t-1])
+            alpha[:,t] = B[:,t] * np.dot(self.A, alpha[:,t-1])
             logLikelihood += np.log(np.sum(alpha[:,t]))
             alpha[:,t] /= np.sum(alpha[:,t])
         return logLikelihood, alpha
@@ -194,32 +216,6 @@ class hmm:
         beta[:, self.T-1] = np.ones(self.Q)
         for t in range(self.T-2,-1,-1):
             beta[:, t] = np.sum(beta[:, t + 1] * B[:, t + 1] * self.A,axis=1)
-            beta[:, t] /= np.sum(beta[:, t])
-        return beta
-    
-    def _forward(self, B):
-        log_likelihood = 0.
-        T = B.shape[1]
-        alpha = np.zeros(B.shape)
-        for t in range(T):
-            if t == 0:
-                alpha[:, t] = B[:, t] * self.alphaPrev
-            else:
-                alpha[:, t] = B[:, t] * np.dot(self.A.T, alpha[:, t - 1])
-         
-            alpha_sum = np.sum(alpha[:, t])
-            alpha[:, t] /= alpha_sum
-            log_likelihood = log_likelihood + np.log(alpha_sum)
-        return log_likelihood, alpha
-    
-    def _backward(self, B):
-        T = B.shape[1]
-        beta = np.zeros(B.shape);
-           
-        beta[:, -1] = np.ones(B.shape[0])
-            
-        for t in range(T - 1)[::-1]:
-            beta[:, t] = np.dot(self.A, (B[:, t + 1] * beta[:, t + 1]))
             beta[:, t] /= np.sum(beta[:, t])
         return beta
         
@@ -306,20 +302,18 @@ class hmm:
                     denA += gamma[i,t]
                 A[i,j] = numA/denA
         
-        #A = hmm.stochasticize(self, self.xiSum)
-        
         # Zero out un-needed A elements
-#        for i in range(0,self.Q):
-#            for j in range(0,self.Q):
-#                if j < i:
-#                    A[i,j] = 0
-#                elif i == 0 and j == 0:
-#                    A[i,j] = 0
-#                elif j > i + 1:
-#                    A[i,j] = 0
+        if self.leftToRight == 1:
+            for i in range(0,self.Q):
+                for j in range(0,self.Q):
+                    if j < i:
+                        A[i,j] = 0
+                    elif i == 0 and j == 0:
+                        A[i,j] = 0
+                    elif j > i + 1:
+                        A[i,j] = 0
 
                 
-                    
         # Update mu
         mu = np.zeros((self.numCoef,self.Q))
         for q in range(self.Q):
@@ -366,6 +360,7 @@ class hmm:
         hmm.emInit(self, Dw)
         conv = np.zeros(numIter)
         for i in range(0,numIter):
+            print("Iteration ",i)
             conv[i] = hmm.em(self, Dw)
         return conv
             

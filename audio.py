@@ -2,7 +2,7 @@ import sounddevice as sd
 import scipy.io.wavfile
 import numpy as np
 
-duration = 2 # seconds
+duration = 3 # seconds
 CHANNELS = 1
 fs = 16000
 
