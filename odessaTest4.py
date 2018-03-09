@@ -94,19 +94,19 @@ if __name__ == "__main__":
     plt.plot(WhatTimeIsItConv)
     
     
-    #data = OdessaMfcc
-    data = PlayMusicMfcc
+    data = OdessaMfcc
+    #data = PlayMusicMfcc
     #data = StopMusicMfcc
     #data = TurnOffTheLightsMfcc
     #data = TurnOnTheLightsMfcc
     #data = WhatTimeIsItMfcc
     
-    probOdessa, llOdessa, alphaOdessa, Bodessa = OdessaHmm.probEvidence(data)
-    probPlayMusic, llPlayMusic, alphaPlayMusic, BplayMusic = PlayMusicHmm.probEvidence(data)
-    probStopMusic, llStopMusic, alphaStopMusic, BstopMusic = StopMusicHmm.probEvidence(data)
-    probTurnOffTheLights, llTurnOffTheLights, alphaTurnOffTheLights, BturnOffTheLights = TurnOffTheLightsHmm.probEvidence(data)
-    probTurnOnTheLights, llTurnOnTheLights, alphaTurnOnTheLights, BturnOnTheLights = TurnOnTheLightsHmm.probEvidence(data)
-    probWhatTimeIsIt, llWhatTimeIsIt, alphaWhatTimeIsIt, BwhatTimeIsIt = WhatTimeIsItHmm.probEvidence(data) 
+    probOdessa, llOdessa, alphaOdessa, betaOdessa, Bodessa = OdessaHmm.probEvidence(data)
+    probPlayMusic, llPlayMusic, alphaPlayMusic, betaPlayMusic, BplayMusic = PlayMusicHmm.probEvidence(data)
+    probStopMusic, llStopMusic, alphaStopMusic, betaStopMusic, BstopMusic = StopMusicHmm.probEvidence(data)
+    probTurnOffTheLights, llTurnOffTheLights, alphaTurnOffTheLights, betaTurnOffTheLights, BturnOffTheLights = TurnOffTheLightsHmm.probEvidence(data)
+    probTurnOnTheLights, llTurnOnTheLights, alphaTurnOnTheLights, betaTurnOnTheLights, BturnOnTheLights = TurnOnTheLightsHmm.probEvidence(data)
+    probWhatTimeIsIt, llWhatTimeIsIt, alphaWhatTimeIsIt, betaTurnOnTheLights, BwhatTimeIsIt = WhatTimeIsItHmm.probEvidence(data) 
     
     
     

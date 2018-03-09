@@ -35,7 +35,7 @@ def inithmm(hmmName, numHmmStates, frameSize, skipSize, numCoef, numDataSets, nu
     # Initialize the  HMM
     hmm = odessa2.hmm(numHmmStates, mfcc, leftToRight)
     
-    hmm.loadData(hmmName + '.npy')
+    hmm.loadData(hmmName)
     return hmm, mfcc
 
 
@@ -69,35 +69,33 @@ if __name__ == "__main__":
     
     """ Stop Music HMM """
     
-    StopMusicHmm, StopMusicMfcc = inithmm("StopMusic", 15, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
+    StopMusicHmm, StopMusicMfcc = inithmm("StopMusic", 12, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
     
     """ Turn Off The Lights HMM """
     
-    TurnOffTheLightsHmm, TurnOffTheLightsMfcc = inithmm("TurnOffTheLights", 20, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
+    TurnOffTheLightsHmm, TurnOffTheLightsMfcc = inithmm("TurnOffTheLights", 30, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
     
     """ Turn On The Lights HMM """
     
-    TurnOnTheLightsHmm, TurnOnTheLightsMfcc = inithmm("TurnOnTheLights", 20, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
+    TurnOnTheLightsHmm, TurnOnTheLightsMfcc = inithmm("TurnOnTheLights", 30, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
     
     """ What Time Is It HMM """
     
     WhatTimeIsItHmm, WhatTimeIsItMfcc = inithmm("WhatTimeIsIt", 15, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
     
     #data = OdessaMfcc
-    data = PlayMusicMfcc
+    #data = PlayMusicMfcc
     #data = StopMusicMfcc
     #data = TurnOffTheLightsMfcc
     #data = TurnOnTheLightsMfcc
-    #data = WhatTimeIsItMfcc
+    data = WhatTimeIsItMfcc
     
-    OdessaHmm
-    
-    probOdessa, llOdessa, alphaOdessa, Bodessa = OdessaHmm.probEvidenceIndep(data)
-    probPlayMusic, llPlayMusic, alphaPlayMusic, BplayMusic = PlayMusicHmm.probEvidenceIndep(data)
-    probStopMusic, llStopMusic, alphaStopMusic, BstopMusic = StopMusicHmm.probEvidenceIndep(data)
-    probTurnOffTheLights, llTurnOffTheLights, alphaTurnOffTheLights, BturnOffTheLights = TurnOffTheLightsHmm.probEvidenceIndep(data)
-    probTurnOnTheLights, llTurnOnTheLights, alphaTurnOnTheLights, BturnOnTheLights = TurnOnTheLightsHmm.probEvidenceIndep(data)
-    probWhatTimeIsIt, llWhatTimeIsIt, alphaWhatTimeIsIt, BwhatTimeIsIt = WhatTimeIsItHmm.probEvidenceIndep(data) 
+    probOdessa, llOdessa, alphaOdessa, betaOdessa, Bodessa = OdessaHmm.probEvidence(data)
+    probPlayMusic, llPlayMusic, alphaPlayMusic, betaPlayMusic, BplayMusic = PlayMusicHmm.probEvidence(data)
+    probStopMusic, llStopMusic, alphaStopMusic, betaStopMusic, BstopMusic = StopMusicHmm.probEvidence(data)
+    probTurnOffTheLights, llTurnOffTheLights, betaTurnOffTheLights, alphaTurnOffTheLights, BturnOffTheLights = TurnOffTheLightsHmm.probEvidence(data)
+    probTurnOnTheLights, llTurnOnTheLights, alphaTurnOnTheLights, betaTurnOnTheLights, BturnOnTheLights = TurnOnTheLightsHmm.probEvidence(data)
+    probWhatTimeIsIt, llWhatTimeIsIt, alphaWhatTimeIsIt, betaWhatTimeIsIt, BwhatTimeIsIt = WhatTimeIsItHmm.probEvidence(data) 
     
     
     
@@ -133,3 +131,12 @@ if __name__ == "__main__":
         print("Error")
         
     print("")
+    
+    Aodessa = OdessaHmm.A
+    AplayMusic = PlayMusicHmm.A
+    AstopMusic = StopMusicHmm.A
+    AturnOffTheLights = TurnOffTheLightsHmm.A
+    AturnOnTheLights = TurnOnTheLightsHmm.A
+    AwhatTimeIsIt = WhatTimeIsItHmm.A
+    
+    A = OdessaHmm.A

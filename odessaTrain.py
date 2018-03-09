@@ -38,6 +38,8 @@ def inithmm(hmmName, numHmmStates, frameSize, skipSize, numCoef, numDataSets, nu
     # Train the HMM
     print("Training the ",hmmName," HMM")
     conv = hmm.train(mfcc, numIter)
+    
+    # Save the state transition matrix A to a file
     hmm.saveData(hmmName)
     return conv, hmm, mfcc
         
@@ -76,11 +78,11 @@ if __name__ == "__main__":
     
     """ Turn Off The Lights HMM """
     
-    TurnOffTheLightsConv, TurnOffTheLightsHmm, TurnOffTheLightsMfcc = inithmm("TurnOffTheLights", 20, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
+    TurnOffTheLightsConv, TurnOffTheLightsHmm, TurnOffTheLightsMfcc = inithmm("TurnOffTheLights", 15, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
     
     """ Turn On The Lights HMM """
     
-    TurnOnTheLightsConv, TurnOnTheLightsHmm, TurnOnTheLightsMfcc = inithmm("TurnOnTheLights", 20, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
+    TurnOnTheLightsConv, TurnOnTheLightsHmm, TurnOnTheLightsMfcc = inithmm("TurnOnTheLights", 15, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
     
     """ What Time Is It HMM """
     
@@ -94,72 +96,6 @@ if __name__ == "__main__":
     plt.plot(TurnOnTheLightsConv)
     plt.plot(WhatTimeIsItConv)
     
+    pEvidence,logLikelihood, alpha, beta, B = OdessaHmm.probEvidence(OdessaMfcc)
     
-    #data = OdessaMfcc
-    data = PlayMusicMfcc
-    #data = StopMusicMfcc
-    #data = TurnOffTheLightsMfcc
-    #data = TurnOnTheLightsMfcc
-    #data = WhatTimeIsItMfcc
-    
-    probOdessa, llOdessa, alphaOdessa, Bodessa = OdessaHmm.probEvidence(data)
-    probPlayMusic, llPlayMusic, alphaPlayMusic, BplayMusic = PlayMusicHmm.probEvidence(data)
-    probStopMusic, llStopMusic, alphaStopMusic, BstopMusic = StopMusicHmm.probEvidence(data)
-    probTurnOffTheLights, llTurnOffTheLights, alphaTurnOffTheLights, BturnOffTheLights = TurnOffTheLightsHmm.probEvidence(data)
-    probTurnOnTheLights, llTurnOnTheLights, alphaTurnOnTheLights, BturnOnTheLights = TurnOnTheLightsHmm.probEvidence(data)
-    probWhatTimeIsIt, llWhatTimeIsIt, alphaWhatTimeIsIt, BwhatTimeIsIt = WhatTimeIsItHmm.probEvidence(data) 
-    
-    
-    
-        
-    print("")
-    
-    print("Odessa HMM: ",llOdessa)
-    print("Play Music HMM: ",llPlayMusic)
-    print("Stop Music HMM: ",llStopMusic)
-    print("Turn Off The Lights HMM: ",llTurnOffTheLights)
-    print("Turn On The Lights HMM: ",llTurnOnTheLights)
-    print("What Time Is It HMM: ",llWhatTimeIsIt)
-    
-    
-    print("")
-    
-    results = np.array([[llOdessa, llPlayMusic, llStopMusic, llTurnOffTheLights, llTurnOnTheLights, llWhatTimeIsIt]])
-    idx = np.argmax(results)
-    
-    if idx == 0:
-        print("Odessa")
-    elif idx == 1:
-        print("Play music")
-    elif idx == 2:
-        print("Stop music")
-    elif idx == 3:
-        print("Turn off the lights")
-    elif idx == 4:
-        print("Turn on the lights")
-    elif idx == 5:
-        print("What time is it")
-    else:
-        print("Error")
-        
-    print("")
-#    
-#    
-#    
-#    alpha1 = hmm1.alpha
-#    beta1  = hmm1.beta
-#    gamma1 = hmm1.gamma
-#    xi1    = hmm1.xi
-#    A1     = hmm1.A
-#    mu1    = hmm1.mu
-#    C1     = hmm1.C
-#    xiSum1 = hmm1.xiSum
-#    
-#    alpha2 = hmm2.alpha
-#    beta2  = hmm2.beta
-#    gamma2 = hmm2.gamma
-#    xi2    = hmm2.xi
-#    A2     = hmm2.A
-#    mu2    = hmm2.mu
-#    C2     = hmm2.C
-#    xiSum2 = hmm2.xiSum
+    A = OdessaHmm.A

@@ -3,6 +3,7 @@ import numpy as np
 import scipy.io.wavfile
 from scipy.fftpack import dct
 import scipy.stats as st
+import os
 
 """ A class for implementing the MFCC and silence detector functions """
 class mfcc:
@@ -143,8 +144,6 @@ class hmm:
                         self.A[i,j] = np.random.rand()
         else:
             self.A = self.randState.rand(self.Q,self.Q)
-            
-        self.Atrained = np.zeros((self.Q,self.Q))
         
         self.xiSum = np.zeros((self.Q,self.Q))
         
@@ -196,37 +195,37 @@ class hmm:
         for t in range(self.T):
             for q in range(self.Q):
                 pEvidence[t] += alpha[q,t]*beta[q,t]
-        return pEvidence,logLikelihood, alpha, B
+        return pEvidence,logLikelihood, alpha, beta, B
     
-    """ Calculate the probability of evidence p(x_1:T) independently of the
-        EM training algorithm """
-    def probEvidenceIndep(self, mfcc):
-        hmm.odessaInit(self, mfcc)
-        B = hmm.pathWeights(self, mfcc)
-        
-        # Compute alpha recursion
-        alpha = np.zeros((self.Q,self.T))
-        alpha[:,0] = B[:,0] * self.alphaPrev
-        logLikelihood = np.log(np.sum(alpha[:,0]))
-        alpha[:,0] /= np.sum(alpha[:,0])
-        for t in range(1,self.T):
-            alpha[:,t] = B[:,t] * np.dot(self.Atrained, alpha[:,t-1])
-            logLikelihood += np.log(np.sum(alpha[:,t]))
-            alpha[:,t] /= np.sum(alpha[:,t])
-        
-        # Compute beta recursion
-        beta = np.zeros(B.shape)
-        beta[:, self.T-1] = np.ones(self.Q)
-        for t in range(self.T-2,-1,-1):
-            beta[:, t] = np.sum(beta[:, t + 1] * B[:, t + 1] * self.Atrained,axis=1)
-            beta[:, t] /= np.sum(beta[:, t])
-        
-        # calculate probability of evidence p(x_1:T)
-        pEvidence = np.zeros(self.T)
-        for t in range(self.T):
-            for q in range(self.Q):
-                pEvidence[t] += alpha[q,t]*beta[q,t]
-        return pEvidence,logLikelihood, alpha, beta
+#    """ Calculate the probability of evidence p(x_1:T) independently of the
+#        EM training algorithm """
+#    def probEvidenceIndep(self, mfcc):
+#        hmm.odessaInit(self, mfcc)
+#        B = hmm.pathWeights(self, mfcc)
+#        
+#        # Compute alpha recursion
+#        alpha = np.zeros((self.Q,self.T))
+#        alpha[:,0] = B[:,0] * self.alphaPrev
+#        logLikelihood = np.log(np.sum(alpha[:,0]))
+#        alpha[:,0] /= np.sum(alpha[:,0])
+#        for t in range(1,self.T):
+#            alpha[:,t] = B[:,t] * np.dot(self.Atrained, alpha[:,t-1])
+#            logLikelihood += np.log(np.sum(alpha[:,t]))
+#            alpha[:,t] /= np.sum(alpha[:,t])
+#     
+#        # Compute beta recursion
+#        beta = np.zeros(B.shape)
+#        beta[:, self.T-1] = np.ones(self.Q)
+#        for t in range(self.T-2,-1,-1):
+#            beta[:, t] = np.sum(beta[:, t + 1] * B[:, t + 1] * self.Atrained,axis=1)
+#            beta[:, t] /= np.sum(beta[:, t])
+#        
+#        # calculate probability of evidence p(x_1:T)
+#        pEvidence = np.zeros(self.T)
+#        for t in range(self.T):
+#            for q in range(self.Q):
+#                pEvidence[t] += alpha[q,t]*beta[q,t]
+#        return pEvidence,logLikelihood, alpha, beta
 
    
     """ Calculate the forward recursion, backward recursion, gamma, and xi """
@@ -371,10 +370,10 @@ class hmm:
             C[:,:,q] += .01 * np.eye(self.numCoef)
                 
         # Update state variables
-        self.alpha = alpha
-        self.beta  = beta
-        self.gamma = gamma
-        self.xi   = xi
+        #self.alpha = alpha
+        #self.beta  = beta
+        #self.gamma = gamma
+        #self.xi   = xi
         self.A     = A
         self.mu    = mu
         self.C     = C
@@ -393,11 +392,17 @@ class hmm:
     
     """ A function to save the trained state transition matrix
         for use with the HMM """
-    def saveData(self, filename):
-        np.save(filename, self.A)
+    def saveData(self, hmmName):
+        if not os.path.exists("state/" + hmmName):
+            os.makedirs("state/" + hmmName)
+        np.save("state/" + hmmName + "/A", self.A)
+        np.save("state/" + hmmName + "/mu",self.mu)
+        np.save("state/" + hmmName + "/C",self.C)
         
     """ A function to load the trained state transition matrix
         for use with the HMM """
-    def loadData(self, filename):
-        self.Atrained =  np.load(filename)
+    def loadData(self, hmmName):
+        self.A = np.load("state/" + hmmName + "/A.npy")
+        self.mu = np.load("state/" + hmmName + "/mu.npy")
+        self.C = np.load("state/" + hmmName + "/C.npy")
             
