@@ -144,7 +144,7 @@ class hmm:
         else:
             self.A = self.randState.rand(self.Q,self.Q)
             
-            
+        self.Atrained = np.zeros((self.Q,self.Q))
         
         self.xiSum = np.zeros((self.Q,self.Q))
         
@@ -197,6 +197,36 @@ class hmm:
             for q in range(self.Q):
                 pEvidence[t] += alpha[q,t]*beta[q,t]
         return pEvidence,logLikelihood, alpha, B
+    
+    """ Calculate the probability of evidence p(x_1:T) independently of the
+        EM training algorithm """
+    def probEvidenceIndep(self, mfcc):
+        hmm.odessaInit(self, mfcc)
+        B = hmm.pathWeights(self, mfcc)
+        
+        # Compute alpha recursion
+        alpha = np.zeros((self.Q,self.T))
+        alpha[:,0] = B[:,0] * self.alphaPrev
+        logLikelihood = np.log(np.sum(alpha[:,0]))
+        alpha[:,0] /= np.sum(alpha[:,0])
+        for t in range(1,self.T):
+            alpha[:,t] = B[:,t] * np.dot(self.Atrained, alpha[:,t-1])
+            logLikelihood += np.log(np.sum(alpha[:,t]))
+            alpha[:,t] /= np.sum(alpha[:,t])
+        
+        # Compute beta recursion
+        beta = np.zeros(B.shape)
+        beta[:, self.T-1] = np.ones(self.Q)
+        for t in range(self.T-2,-1,-1):
+            beta[:, t] = np.sum(beta[:, t + 1] * B[:, t + 1] * self.Atrained,axis=1)
+            beta[:, t] /= np.sum(beta[:, t])
+        
+        # calculate probability of evidence p(x_1:T)
+        pEvidence = np.zeros(self.T)
+        for t in range(self.T):
+            for q in range(self.Q):
+                pEvidence[t] += alpha[q,t]*beta[q,t]
+        return pEvidence,logLikelihood, alpha, beta
 
    
     """ Calculate the forward recursion, backward recursion, gamma, and xi """
@@ -225,7 +255,7 @@ class hmm:
     def stochasticize(self, x):
         return (x + (x == 0)) / np.sum(x, axis=1)
     
-    def emInit(self, x):
+    def odessaInit(self, x):
         self.randState = np.random.RandomState(0)
         
         self.A = self.stochasticize(self.randState.rand(self.Q, self.Q))
@@ -352,15 +382,22 @@ class hmm:
         return logLikelihood
     
     
-                
-   
-    
     """ A function to train the HMM on a sequence of data """
     def train(self, Dw, numIter):
-        hmm.emInit(self, Dw)
+        hmm.odessaInit(self, Dw)
         conv = np.zeros(numIter)
         for i in range(0,numIter):
             print("Iteration ",i)
             conv[i] = hmm.em(self, Dw)
         return conv
+    
+    """ A function to save the trained state transition matrix
+        for use with the HMM """
+    def saveData(self, filename):
+        np.save(filename, self.A)
+        
+    """ A function to load the trained state transition matrix
+        for use with the HMM """
+    def loadData(self, filename):
+        self.Atrained =  np.load(filename)
             
