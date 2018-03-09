@@ -52,7 +52,7 @@ if __name__ == "__main__":
     
     numDataSets   = 1 
     
-    leftToRight = 0 # Force the use of a left to right HMM model
+    leftToRight = 1 # Force the use of a left to right HMM model
     
     ydim = 10
     xdim = 100
@@ -66,27 +66,27 @@ if __name__ == "__main__":
     
     """ Odessa HMM """
     
-    OdessaConv, OdessaHmm, OdessaMfcc = inithmm("odessa", 6, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
+    OdessaConv, OdessaHmm, OdessaMfcc = inithmm("odessa", 10, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
     
     """ Play Music HMM """
     
-    PlayMusicConv, PlayMusicHmm, PlayMusicMfcc = inithmm("PlayMusic", 15, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
+    PlayMusicConv, PlayMusicHmm, PlayMusicMfcc = inithmm("PlayMusic", 6, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
     
     """ Stop Music HMM """
     
-    StopMusicConv, StopMusicHmm, StopMusicMfcc = inithmm("StopMusic", 15, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
+    StopMusicConv, StopMusicHmm, StopMusicMfcc = inithmm("StopMusic", 6, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
     
     """ Turn Off The Lights HMM """
     
-    TurnOffTheLightsConv, TurnOffTheLightsHmm, TurnOffTheLightsMfcc = inithmm("TurnOffTheLights", 15, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
+    TurnOffTheLightsConv, TurnOffTheLightsHmm, TurnOffTheLightsMfcc = inithmm("TurnOffTheLights", 8, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
     
     """ Turn On The Lights HMM """
     
-    TurnOnTheLightsConv, TurnOnTheLightsHmm, TurnOnTheLightsMfcc = inithmm("TurnOnTheLights", 15, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
+    TurnOnTheLightsConv, TurnOnTheLightsHmm, TurnOnTheLightsMfcc = inithmm("TurnOnTheLights", 8, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
     
     """ What Time Is It HMM """
     
-    WhatTimeIsItConv, WhatTimeIsItHmm, WhatTimeIsItMfcc = inithmm("WhatTimeIsIt", 15, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
+    WhatTimeIsItConv, WhatTimeIsItHmm, WhatTimeIsItMfcc = inithmm("WhatTimeIsIt", 8, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
     
     plt.figure()
     plt.plot(OdessaConv)    
@@ -96,6 +96,4 @@ if __name__ == "__main__":
     plt.plot(TurnOnTheLightsConv)
     plt.plot(WhatTimeIsItConv)
     
-    pEvidence,logLikelihood, alpha, beta, B = OdessaHmm.probEvidence(OdessaMfcc)
-    
-    A = OdessaHmm.A
+    A = WhatTimeIsItHmm.A

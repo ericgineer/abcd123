@@ -61,27 +61,27 @@ if __name__ == "__main__":
     
     """ Odessa HMM """
     
-    OdessaHmm, OdessaMfcc = inithmm("odessa", 6, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
+    OdessaHmm, OdessaMfcc = inithmm("odessa", 10, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
     
     """ Play Music HMM """
     
-    PlayMusicHmm, PlayMusicMfcc = inithmm("PlayMusic", 15, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
+    PlayMusicHmm, PlayMusicMfcc = inithmm("PlayMusic", 6, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
     
     """ Stop Music HMM """
     
-    StopMusicHmm, StopMusicMfcc = inithmm("StopMusic", 12, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
+    StopMusicHmm, StopMusicMfcc = inithmm("StopMusic", 6, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
     
     """ Turn Off The Lights HMM """
     
-    TurnOffTheLightsHmm, TurnOffTheLightsMfcc = inithmm("TurnOffTheLights", 30, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
+    TurnOffTheLightsHmm, TurnOffTheLightsMfcc = inithmm("TurnOffTheLights", 8, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
     
     """ Turn On The Lights HMM """
     
-    TurnOnTheLightsHmm, TurnOnTheLightsMfcc = inithmm("TurnOnTheLights", 30, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
+    TurnOnTheLightsHmm, TurnOnTheLightsMfcc = inithmm("TurnOnTheLights", 8, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
     
     """ What Time Is It HMM """
     
-    WhatTimeIsItHmm, WhatTimeIsItMfcc = inithmm("WhatTimeIsIt", 15, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
+    WhatTimeIsItHmm, WhatTimeIsItMfcc = inithmm("WhatTimeIsIt", 8, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
     
     #data = OdessaMfcc
     #data = PlayMusicMfcc

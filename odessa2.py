@@ -332,15 +332,15 @@ class hmm:
                 A[i,j] = numA/denA
         
         # Zero out un-needed A elements
-        if self.leftToRight == 1:
-            for i in range(0,self.Q):
-                for j in range(0,self.Q):
-                    if j < i:
-                        A[i,j] = 0
-                    elif i == 0 and j == 0:
-                        A[i,j] = 0
-                    elif j > i + 1:
-                        A[i,j] = 0
+#        if self.leftToRight == 1:
+#            for i in range(0,self.Q):
+#                for j in range(0,self.Q):
+#                    if j < i:
+#                        A[i,j] = 0
+#                    elif i == 0 and j == 0:
+#                        A[i,j] = 0
+#                    elif j > i + 1:
+#                        A[i,j] = 0
 
                 
         # Update mu
@@ -364,16 +364,16 @@ class hmm:
             for c in range(self.numCoef):
                 C[c,c,q] = numC[c] / denC
                 
-        expected_covs = np.zeros((self.numCoef, self.numCoef, self.Q))
-        expected_covs += .01 * np.eye(self.numCoef)[:, :, None]
-        for q in range(self.Q):
-            C[:,:,q] += .01 * np.eye(self.numCoef)
+#        expected_covs = np.zeros((self.numCoef, self.numCoef, self.Q))
+#        expected_covs += .01 * np.eye(self.numCoef)[:, :, None]
+#        for q in range(self.Q):
+#            C[:,:,q] += .01 * np.eye(self.numCoef)
                 
         # Update state variables
-        #self.alpha = alpha
-        #self.beta  = beta
-        #self.gamma = gamma
-        #self.xi   = xi
+        self.alpha = alpha
+        self.beta  = beta
+        self.gamma = gamma
+        self.xi   = xi
         self.A     = A
         self.mu    = mu
         self.C     = C
