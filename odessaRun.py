@@ -9,31 +9,20 @@ plt.close('all')
             
 def loadWavData(phrase, frameSize, skipSize, numCoef, numDataSets):
     # Load some training wav files to get MFCC training data
-    FILENAME = "audio/" + phrase + "/" + phrase + "1.wav" # Name of wav file
+    FILENAME = "audio/test/" + phrase + ".wav" # Name of wav file
     fs, wavData = scipy.io.wavfile.read(FILENAME)    
-    mfccVect = odessa2.mfcc.getMfcc(wavData, fs, frameSize, skipSize, numCoef)
-    if numDataSets > 1:
-        Dw = np.zeros((mfccVect.shape[0],mfccVect.shape[1],numDataSets))
-        Dw[:,:,0] = mfccVect
-        for i in range(1,numDataSets+1):
-            FILENAME = "audio/" + phrase + "/" + phrase + str(i) + ".wav" # Name of wav file
-            print("Reading wave file " + FILENAME)
-            fs, wavData = scipy.io.wavfile.read(FILENAME)
-            mfccVect = odessa2.mfcc.getMfcc(wavData, fs, frameSize, skipSize, numCoef)
-            Dw[:,:,i-1] = mfccVect
-    else:
-        Dw = mfccVect
+    Dw = odessa2.mfcc.getMfcc(wavData, fs, frameSize, skipSize, numCoef)
     return Dw
 
-def inithmm(hmmName, numHmmStates, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight):
+def inithmm(hmmName, filename, numHmmStates, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight):
     # Load training data
-    Dw = loadWavData(hmmName, frameSize, skipSize, numCoef, numDataSets)
+    Dw = loadWavData(filename, frameSize, skipSize, numCoef, 1)
     mfcc = Dw # / np.max(np.abs(Dw1))
     #np.random.seed(0)
     #d1 = np.random.rand(ydim, xdim)
     
     # Initialize the  HMM
-    hmm = odessa2.hmm(numHmmStates, mfcc, leftToRight)
+    hmm = odessa2.hmm(numHmmStates, mfcc, leftToRight, numDataSets)
     
     hmm.loadData(hmmName)
     return hmm, mfcc
@@ -53,7 +42,7 @@ if __name__ == "__main__":
     ydim = 10
     xdim = 100
     
-    numDataSets   = 1 
+    numDataSets   = 10 
     
     numStates = 5
     
@@ -61,34 +50,34 @@ if __name__ == "__main__":
     
     """ Odessa HMM """
     
-    OdessaHmm, OdessaMfcc = inithmm("odessa", 10, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
+    OdessaHmm, OdessaMfcc = inithmm("odessa", "odessaTest", 8, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
     
     """ Play Music HMM """
     
-    PlayMusicHmm, PlayMusicMfcc = inithmm("PlayMusic", 6, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
+    PlayMusicHmm, PlayMusicMfcc = inithmm("PlayMusic", "PlayMusicTest", 8, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
     
     """ Stop Music HMM """
     
-    StopMusicHmm, StopMusicMfcc = inithmm("StopMusic", 6, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
+    StopMusicHmm, StopMusicMfcc = inithmm("StopMusic", "StopMusicTest", 9, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
     
     """ Turn Off The Lights HMM """
     
-    TurnOffTheLightsHmm, TurnOffTheLightsMfcc = inithmm("TurnOffTheLights", 8, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
+    TurnOffTheLightsHmm, TurnOffTheLightsMfcc = inithmm("TurnOffTheLights", "TurnOffTheLightsTest", 9, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
     
     """ Turn On The Lights HMM """
     
-    TurnOnTheLightsHmm, TurnOnTheLightsMfcc = inithmm("TurnOnTheLights", 8, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
+    TurnOnTheLightsHmm, TurnOnTheLightsMfcc = inithmm("TurnOnTheLights", "TurnOnTheLightsTest", 9, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
     
     """ What Time Is It HMM """
     
-    WhatTimeIsItHmm, WhatTimeIsItMfcc = inithmm("WhatTimeIsIt", 8, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
+    WhatTimeIsItHmm, WhatTimeIsItMfcc = inithmm("WhatTimeIsIt", "WhatTimeIsItTest", 9, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
     
     #data = OdessaMfcc
-    #data = PlayMusicMfcc
+    data = PlayMusicMfcc
     #data = StopMusicMfcc
     #data = TurnOffTheLightsMfcc
     #data = TurnOnTheLightsMfcc
-    data = WhatTimeIsItMfcc
+    #data = WhatTimeIsItMfcc
     
     probOdessa, llOdessa, alphaOdessa, betaOdessa, Bodessa = OdessaHmm.probEvidence(data)
     probPlayMusic, llPlayMusic, alphaPlayMusic, betaPlayMusic, BplayMusic = PlayMusicHmm.probEvidence(data)
@@ -112,7 +101,8 @@ if __name__ == "__main__":
     
     print("")
     
-    results = np.array([[llOdessa, llPlayMusic, llStopMusic, llTurnOffTheLights, llTurnOnTheLights, llWhatTimeIsIt]])
+    #results = np.array([[llOdessa, llPlayMusic, llStopMusic, llTurnOffTheLights, llTurnOnTheLights, llWhatTimeIsIt]])
+    results = np.array([probOdessa[-2],probPlayMusic[-2],probStopMusic[-2],probTurnOffTheLights[-2],probTurnOnTheLights[-2],probWhatTimeIsIt[-2]])
     idx = np.argmax(results)
     
     if idx == 0:

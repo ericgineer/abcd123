@@ -113,7 +113,7 @@ class mfcc:
 
 class hmm:
     """ A class to implement a HMM for speech recognition """
-    def __init__(self, numStates, mfcc, leftToRight):
+    def __init__(self, numStates, mfcc, leftToRight, numDataSets):
         """ Initialize HMM variables """
         self.Q = numStates  # Number of states to use in the HMM
                             # (should be the number of phonenems in the phrase)
@@ -124,6 +124,8 @@ class hmm:
         self.randState = np.random.RandomState(0)
         
         self.leftToRight = leftToRight
+        
+        self.L = numDataSets
         
         #self.A = self.stochasticize(self.randState.rand(self.Q, self.Q))
         
@@ -165,9 +167,13 @@ class hmm:
         
         self.beta = np.zeros((self.Q,self.T))
         
-        self.gamma = np.zeros((self.Q, self.T))
         
-        self.xi = np.zeros((self.Q,self.Q,self.T))
+        if self.L > 1:
+            self.gamma = np.zeros((self.Q, self.T,self.L))
+            self.xi = np.zeros((self.Q,self.Q,self.T,self.L))
+        else:
+            self.gamma = np.zeros((self.Q, self.T))
+            self.xi = np.zeros((self.Q,self.Q,self.T))
 
     """ Function to calculate the path weight matrix p(x_t | Q_t = q) """
     def pathWeights(self, x):
@@ -196,36 +202,6 @@ class hmm:
             for q in range(self.Q):
                 pEvidence[t] += alpha[q,t]*beta[q,t]
         return pEvidence,logLikelihood, alpha, beta, B
-    
-#    """ Calculate the probability of evidence p(x_1:T) independently of the
-#        EM training algorithm """
-#    def probEvidenceIndep(self, mfcc):
-#        hmm.odessaInit(self, mfcc)
-#        B = hmm.pathWeights(self, mfcc)
-#        
-#        # Compute alpha recursion
-#        alpha = np.zeros((self.Q,self.T))
-#        alpha[:,0] = B[:,0] * self.alphaPrev
-#        logLikelihood = np.log(np.sum(alpha[:,0]))
-#        alpha[:,0] /= np.sum(alpha[:,0])
-#        for t in range(1,self.T):
-#            alpha[:,t] = B[:,t] * np.dot(self.Atrained, alpha[:,t-1])
-#            logLikelihood += np.log(np.sum(alpha[:,t]))
-#            alpha[:,t] /= np.sum(alpha[:,t])
-#     
-#        # Compute beta recursion
-#        beta = np.zeros(B.shape)
-#        beta[:, self.T-1] = np.ones(self.Q)
-#        for t in range(self.T-2,-1,-1):
-#            beta[:, t] = np.sum(beta[:, t + 1] * B[:, t + 1] * self.Atrained,axis=1)
-#            beta[:, t] /= np.sum(beta[:, t])
-#        
-#        # calculate probability of evidence p(x_1:T)
-#        pEvidence = np.zeros(self.T)
-#        for t in range(self.T):
-#            for q in range(self.Q):
-#                pEvidence[t] += alpha[q,t]*beta[q,t]
-#        return pEvidence,logLikelihood, alpha, beta
 
    
     """ Calculate the forward recursion, backward recursion, gamma, and xi """
@@ -318,7 +294,7 @@ class hmm:
         #xi[:,:,0] = hmm.normalize(self, np.dot(self.alphaPrev, (beta[:,t] * B[:,t]).T) * A) # / pEvidence[0]
         #self.xiSum = xi[:,:,0]
         for t in range(self.T-1):
-            xi[:,:,t] = hmm.normalize(self, np.dot(alpha[:,t], (beta[:,t] * B[:,t+1]).T) * A) # / pEvidence[t]
+            xi[:,:,t] = hmm.normalize(self, np.dot(alpha[:,t], (beta[:,t] * B[:,t+1]).T) * A / pEvidence[t])
             self.xiSum += xi[:,:,t]
             
         # Update A
@@ -380,14 +356,99 @@ class hmm:
         
         return logLikelihood
     
+    """ Expectation-Maximization algorithm """
+    def em2(self, x):
+        A = self.A
+        gamma = np.zeros((self.Q, self.T,self.L))
+        xi = np.zeros((self.Q,self.Q,self.T,self.L))
+        for l in range(self.L):        
+            B = hmm.pathWeights(self, x[:,:,l])    
+         
+            logLikelihood, alpha = hmm.alphaRecursion(self, B)
+            beta = hmm.betaRecursion(self, B)
+            
+            # Calculate gamma
+            for t in range(self.T):
+                for q in range(self.Q):
+                    gammaSum = 0
+                    for qq in range(self.Q):
+                        gammaSum += alpha[qq,t] * beta[qq,t]
+                    gamma[q,t,l] = alpha[q,t]*beta[q,t] / gammaSum
+            
+        
+            # Calculate xi
+            pEvidence = np.zeros(self.T)
+            for t in range(self.T):
+                for q in range(self.Q):
+                    pEvidence[t] += alpha[q,t]*beta[q,t]
+        
+            for t in range(self.T-1):
+                xi[:,:,t,l] = hmm.normalize(self, np.dot(alpha[:,t], (beta[:,t] * B[:,t+1]).T) * A / pEvidence[t])
+            
+        # Update A
+        for i in range(self.Q):
+            for j in range(self.Q):
+                numA = 0
+                denA = 0
+                for l in range(self.L):
+                    for t in range(self.T):
+                        numA += xi[i,j,t,l]
+                        denA += gamma[i,t,l]
+                A[i,j] = numA/denA
+                
+        # Update mu
+        mu = np.zeros((self.numCoef,self.Q))
+        for q in range(self.Q):
+            numMu = 0
+            denMu = 0
+            for l in range(self.L):
+                for t in range(self.T):
+                    numMu += x[:,t,l] *  gamma[q,t,l]
+                    denMu += gamma[q,t,l]
+            mu[:,q] = numMu / denMu # + 0.01 * np.random.rand(self.numCoef)
+            
+        # Update C
+        C = np.zeros((self.numCoef, self.numCoef, self.Q))
+        for q in range(self.Q):
+            numC = 0
+            denC = 0
+            for l in range(self.L):
+                for t in range(self.T):
+                    numC += (x[:,t,l]-mu[:,q]) * (x[:,t,l]-mu[:,q]) * gamma[q,t,l]
+                    denC += gamma[q,t,l]
+            for c in range(self.numCoef):
+                C[c,c,q] = numC[c] / denC
+                
+#        expected_covs = np.zeros((self.numCoef, self.numCoef, self.Q))
+#        expected_covs += .01 * np.eye(self.numCoef)[:, :, None]
+#        for q in range(self.Q):
+#            C[:,:,q] += .01 * np.eye(self.numCoef)
+                
+        # Update state variables
+        self.alpha = alpha
+        self.beta  = beta
+        self.gamma = gamma
+        self.xi   = xi
+        self.A     = A
+        self.mu    = mu
+        self.C     = C
+        
+        return logLikelihood
+    
     
     """ A function to train the HMM on a sequence of data """
     def train(self, Dw, numIter):
-        hmm.odessaInit(self, Dw)
+        if self.L > 1:
+            hmm.odessaInit(self, Dw[:,:,0])
+        else:
+            hmm.odessaInit(self, Dw)
         conv = np.zeros(numIter)
         for i in range(0,numIter):
             print("Iteration ",i)
-            conv[i] = hmm.em(self, Dw)
+            if self.L > 1:
+                conv[i] = hmm.em2(self, Dw)
+            else:
+                conv[i] = hmm.em(self, Dw)
         return conv
     
     """ A function to save the trained state transition matrix

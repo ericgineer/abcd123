@@ -28,16 +28,19 @@ def loadWavData(phrase, frameSize, skipSize, numCoef, numDataSets):
 def inithmm(hmmName, numHmmStates, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight):
     # Load training data
     Dw = loadWavData(hmmName, frameSize, skipSize, numCoef, numDataSets)
-    mfcc = Dw # / np.max(np.abs(Dw1))
+    if numDataSets > 1:
+        mfcc = Dw[:,:,0]
+    else:
+        mfcc = Dw
     #np.random.seed(0)
     #d1 = np.random.rand(ydim, xdim)
     
     # Initialize the  HMM
-    hmm = odessa2.hmm(numHmmStates, mfcc, leftToRight)
+    hmm = odessa2.hmm(numHmmStates, mfcc, leftToRight, numDataSets)
     
     # Train the HMM
     print("Training the ",hmmName," HMM")
-    conv = hmm.train(mfcc, numIter)
+    conv = hmm.train(Dw, numIter)
     
     # Save the state transition matrix A to a file
     hmm.saveData(hmmName)
@@ -50,14 +53,14 @@ if __name__ == "__main__":
                    # and the start of the next frame
     numCoef   = 13 # Number of MFCC coefficients
     
-    numDataSets   = 1 
+    numDataSets   = 2 
     
     leftToRight = 1 # Force the use of a left to right HMM model
     
     ydim = 10
     xdim = 100
     
-    numDataSets   = 1 
+    numDataSets   = 10 
     
     numStates = 5
     
@@ -66,27 +69,27 @@ if __name__ == "__main__":
     
     """ Odessa HMM """
     
-    OdessaConv, OdessaHmm, OdessaMfcc = inithmm("odessa", 10, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
+    OdessaConv, OdessaHmm, OdessaMfcc = inithmm("odessa", 8, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
     
     """ Play Music HMM """
     
-    PlayMusicConv, PlayMusicHmm, PlayMusicMfcc = inithmm("PlayMusic", 6, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
+    PlayMusicConv, PlayMusicHmm, PlayMusicMfcc = inithmm("PlayMusic", 8, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
     
     """ Stop Music HMM """
     
-    StopMusicConv, StopMusicHmm, StopMusicMfcc = inithmm("StopMusic", 6, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
+    StopMusicConv, StopMusicHmm, StopMusicMfcc = inithmm("StopMusic", 9, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
     
     """ Turn Off The Lights HMM """
     
-    TurnOffTheLightsConv, TurnOffTheLightsHmm, TurnOffTheLightsMfcc = inithmm("TurnOffTheLights", 8, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
+    TurnOffTheLightsConv, TurnOffTheLightsHmm, TurnOffTheLightsMfcc = inithmm("TurnOffTheLights", 9, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
     
     """ Turn On The Lights HMM """
     
-    TurnOnTheLightsConv, TurnOnTheLightsHmm, TurnOnTheLightsMfcc = inithmm("TurnOnTheLights", 8, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
+    TurnOnTheLightsConv, TurnOnTheLightsHmm, TurnOnTheLightsMfcc = inithmm("TurnOnTheLights", 9, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
     
     """ What Time Is It HMM """
     
-    WhatTimeIsItConv, WhatTimeIsItHmm, WhatTimeIsItMfcc = inithmm("WhatTimeIsIt", 8, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
+    WhatTimeIsItConv, WhatTimeIsItHmm, WhatTimeIsItMfcc = inithmm("WhatTimeIsIt", 9, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
     
     plt.figure()
     plt.plot(OdessaConv)    
@@ -95,5 +98,3 @@ if __name__ == "__main__":
     plt.plot(TurnOffTheLightsConv)
     plt.plot(TurnOnTheLightsConv)
     plt.plot(WhatTimeIsItConv)
-    
-    A = WhatTimeIsItHmm.A
