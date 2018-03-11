@@ -3,7 +3,7 @@ import numpy as np
 import scipy.io.wavfile
 from scipy.fftpack import dct
 import scipy.stats as st
-import odessa2
+import odessa
 
 plt.close('all')
             
@@ -11,7 +11,7 @@ def loadWavData(phrase, frameSize, skipSize, numCoef, numDataSets):
     # Load some training wav files to get MFCC training data
     FILENAME = "audio/" + phrase + "/" + phrase + "1.wav" # Name of wav file
     fs, wavData = scipy.io.wavfile.read(FILENAME)    
-    mfccVect = odessa2.mfcc.getMfcc(wavData, fs, frameSize, skipSize, numCoef)
+    mfccVect = odessa.mfcc.getMfcc(wavData, fs, frameSize, skipSize, numCoef)
     if numDataSets > 1:
         Dw = np.zeros((mfccVect.shape[0],mfccVect.shape[1],numDataSets))
         Dw[:,:,0] = mfccVect
@@ -19,7 +19,7 @@ def loadWavData(phrase, frameSize, skipSize, numCoef, numDataSets):
             FILENAME = "audio/" + phrase + "/" + phrase + str(i) + ".wav" # Name of wav file
             print("Reading wave file " + FILENAME)
             fs, wavData = scipy.io.wavfile.read(FILENAME)
-            mfccVect = odessa2.mfcc.getMfcc(wavData, fs, frameSize, skipSize, numCoef)
+            mfccVect = odessa.mfcc.getMfcc(wavData, fs, frameSize, skipSize, numCoef)
             Dw[:,:,i-1] = mfccVect
     else:
         Dw = mfccVect
@@ -36,7 +36,7 @@ def inithmm(hmmName, numHmmStates, frameSize, skipSize, numCoef, numDataSets, nu
     #d1 = np.random.rand(ydim, xdim)
     
     # Initialize the  HMM
-    hmm = odessa2.hmm(numHmmStates, leftToRight, numDataSets)
+    hmm = odessa.hmm(numHmmStates, leftToRight, numDataSets)
     
     # Train the HMM
     print("Training the ",hmmName," HMM")

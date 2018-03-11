@@ -3,7 +3,7 @@ import numpy as np
 import scipy.io.wavfile
 from scipy.fftpack import dct
 import scipy.stats as st
-import odessa2
+import odessa
 
 plt.close('all')
             
@@ -11,7 +11,7 @@ def loadWavData(phrase, frameSize, skipSize, numCoef, numDataSets):
     # Load some training wav files to get MFCC training data
     FILENAME = "audio/" + phrase + "/" + phrase + "1.wav" # Name of wav file
     fs, wavData = scipy.io.wavfile.read(FILENAME)    
-    mfccVect = odessa2.mfcc.getMfcc(wavData, fs, frameSize, skipSize, numCoef)
+    mfccVect = odessa.mfcc.getMfcc(wavData, fs, frameSize, skipSize, numCoef)
     if numDataSets > 1:
         Dw = np.zeros((mfccVect.shape[0],mfccVect.shape[1],numDataSets))
         Dw[:,:,0] = mfccVect
@@ -19,7 +19,7 @@ def loadWavData(phrase, frameSize, skipSize, numCoef, numDataSets):
             FILENAME = "audio/" + phrase + "/" + phrase + str(i) + ".wav" # Name of wav file
             print("Reading wave file " + FILENAME)
             fs, wavData = scipy.io.wavfile.read(FILENAME)
-            mfccVect = odessa2.mfcc.getMfcc(wavData, fs, frameSize, skipSize, numCoef)
+            mfccVect = odessa.mfcc.getMfcc(wavData, fs, frameSize, skipSize, numCoef)
             Dw[:,:,i-1] = mfccVect
     else:
         Dw = mfccVect
@@ -54,7 +54,7 @@ if __name__ == "__main__":
     d1 = np.random.rand(ydim, xdim)
     
     # Initialize the "Odessa" HMM
-    hmm1 = odessa2.hmm(numStates, leftToRight, numDataSets)
+    hmm1 = odessa.hmm(numStates, leftToRight, numDataSets)
     
     # Train the "Odessa" HMM
     conv1 = hmm1.train(d1, numIter)
@@ -67,7 +67,7 @@ if __name__ == "__main__":
     d2 = np.random.rand(ydim, xdim)
     
     # Initialize the "Odessa" HMM
-    hmm2 = odessa2.hmm(numStates, leftToRight, numDataSets)
+    hmm2 = odessa.hmm(numStates, leftToRight, numDataSets)
     
     # Train the "Odessa" HMM
     conv2 = hmm2.train(d2, numIter)
@@ -123,9 +123,9 @@ if __name__ == "__main__":
 #    t2 = rstate.rand(*t1.shape)
 #    t2 /= t2.sum(axis=0)
 #    
-#    m1 = odessa2.hmm(numStates, t1, leftToRight)   
+#    m1 = odessa.hmm(numStates, t1, leftToRight)   
 #    conv1 = m1.train(t1, numIter)
-#    m2 = odessa2.hmm(numStates, t2, leftToRight)
+#    m2 = odessa.hmm(numStates, t2, leftToRight)
 #    conv2 = m2.train(t2, numIter)
 #    
 #    p11, m1t1, alpha11, B11 = m1.probEvidence(t1)

@@ -3,6 +3,7 @@ import numpy as np
 import scipy.io.wavfile
 from scipy.fftpack import dct
 import scipy.stats as st
+import os
 
 """ A class for implementing the MFCC and silence detector functions """
 class mfcc:
@@ -14,13 +15,11 @@ class mfcc:
         self.frameAv = 10 # Number of frames to average for threshold calculation
         self.pastFrames = 15 # Number of past frames to use for threshold comparison
         self.pastEs = np.zeros(self.pastFrames)
-        self.silenceDetectVect = []
-        self.dataVect = np.zeros((self.frameSamples,1))
     
     """ Silence detection function """
     
     def silenceDetect(self, frame):        
-        Es = sum(abs(frame)) # Calculate the energy in the frame
+        Es = np.sum(np.abs(frame)) # Calculate the energy in the frame
         # Update shift register that holds previous values of Es
         for i in range(0,self.pastFrames): 
             if i == self.pastFrames-1:
@@ -30,10 +29,10 @@ class mfcc:
         # Average the first <frameAv> frames with the assumption that there is 
         # no speech in them to get the threshold value
         if self.frameIdx < self.frameAv:
-            self.thresholdEs += Es/10
+            self.thresholdEs += Es
             self.frameIdx += 1 # Update frame index counter
             return 0
-        elif (self.pastEs > self.thresholdEs+self.thresholdEs).any() and self.frameIdx > self.pastFrames: 
+        elif (self.pastEs > self.thresholdEs).any() and self.frameIdx > self.pastFrames: 
             self.frameIdx += 1 # Update frame index counter
             return 1
         else:
@@ -112,293 +111,327 @@ class mfcc:
 
 class hmm:
     """ A class to implement a HMM for speech recognition """
-    def __init__(self, numStates, mfcc):
-        
+    def __init__(self, numStates, leftToRight, numDataSets):
         """ Initialize HMM variables """
-        self.N = numStates  # Number of states to use in the HMM
+        self.Q = numStates  # Number of states to use in the HMM
                             # (should be the number of phonenems in the phrase)
-                            
-        self.n_states = numStates
+        
         self.randState = np.random.RandomState(0)
         
-        self.n_dims = []
+        self.leftToRight = leftToRight
         
-        self.testGamma = []
-        self.testXi = []
-        
-        self.covs = []
+        #self.A = self.stochasticize(self.randState.rand(self.Q, self.Q))
         
         # Initialize transition matrix with random probabilities
-        self.A = np.zeros((self.N, self.N))
-        for i in range(0,self.N):
-            for j in range(0,self.N):
-                if j < i:
-                    self.A[i,j] = 0
-                elif i == self.N-1 and j == self.N-1:
-                    self.A[i,j] = 1
-                elif i == 0 and j == 0:
-                    self.A[i,j] = 0
-                elif j > i + 1:
-                    self.A[i,j] = 0
-                else:
-                    self.A[i,j] = np.random.rand()
+        if self.leftToRight == 1:
+            self.A = np.zeros((self.Q, self.Q))
+            for i in range(0,self.Q):
+                for j in range(0,self.Q):
+                    if j < i:
+                        self.A[i,j] = 0
+                    elif i == self.Q-1 and j == self.Q-1:
+                        self.A[i,j] = 1
+                    elif i == 0 and j == 0:
+                        self.A[i,j] = 0
+                    elif j > i + 1:
+                        self.A[i,j] = 0
+                    else:
+                        self.A[i,j] = np.random.rand()
+        else:
+            self.A = self.randState.rand(self.Q,self.Q)
         
-        # Initialize state distribution vector
-        self.prior = np.random.rand(self.N,1)
-        self.prior /= max(self.prior)
+        self.xiSum = np.zeros((self.Q,self.Q))
         
-        subset = self.randState.choice(np.arange(mfcc.shape[0]), size=self.N, replace=True)
-        self.mu = mfcc[:, subset]
+        self.mu = []
         
-        # Initialize covariance matrix
-        self.C = np.zeros((mfcc.shape[0], mfcc.shape[0], self.N))
-        self.C += np.diag(np.diag(np.cov(mfcc)))[:, :, None]
+        self.C = []
         
         # Initialize the state likelihoood matrix p(x_t | Q_t = q)
-        self.B = np.zeros((self.N, mfcc.shape[1]))
+        self.B = []
+        
+        self.alphaPrev = self.randState.rand(self.Q)
+        self.alphaPrev /= np.sum(self.alphaPrev)
+        
+        self.alpha = []
+        
+        self.beta = []
 
-    """ Function to calculate the state likelihood matrix p(x_t | Q_t = q) """
-    def stateLikelihood(self, obs):
-        obs = np.atleast_2d(obs)
-        for s in range(self.N):
-            #Needs scipy 0.14
-            np.random.seed(self.randState.randint(1))
-            self.B[s, :] = st.multivariate_normal.pdf(
-                obs.T, mean=self.mu[:, s].T, cov=self.C[:, :, s].T)
-            #This function can (and will!) return values >> 1
-            #See the discussion here for the equivalent matlab function
-            #https://groups.google.com/forum/#!topic/comp.soft-sys.matlab/YksWK0T74Ak
-            #Key line: "Probabilities have to be less than 1,
-            #Densities can be anything, even infinite (at individual points)."
-            #This is evaluating the density at individual points...
-            
-        return self.B
+    """ Function to calculate the path weight matrix p(x_t | Q_t = q) """
+    def pathWeights(self, x):
+        self.numCoef = x.shape[0]
+        self.T = x.shape[1]
+        B = np.zeros((self.Q, self.T))
+        for t in range(self.T):
+            for q in range(self.Q):
+                exponent = 0
+                for c in range(self.numCoef):
+                    exponent += (x[c,t]-self.mu[c,q]) * 1/self.C[c,c,q] * (x[c,t]-self.mu[c,q])
+                B[q,t] = 1/np.sqrt(np.linalg.det(2*np.pi*self.C[:,:,q]))*np.exp(-1/2 * exponent)
+        return B
     
     """ Calculate the probability of evidence p(x_1:T) """
     def probEvidence(self, mfcc):
-        p = hmm.stateLikelihood(self, mfcc)
-        #alpha, beta, gamma, xi, logLikelihood = hmm.recursion(self, p)
-        #pEvidence = np.log(np.sum(alpha*beta,axis=0))
-        logLikelihood, alpha = hmm._forward(self, p)
-        return logLikelihood
+        B = hmm.pathWeights(self, mfcc)
+        logLikelihood, alpha = hmm.alphaRecursion(self, B)
+        beta = hmm.betaRecursion(self, B)
+        pEvidence = np.zeros(self.T)
+        for t in range(self.T):
+            for q in range(self.Q):
+                pEvidence[t] += alpha[q,t]*beta[q,t]
+        return pEvidence,logLikelihood, alpha, beta, B
 
-
-    """ Expectation-Maximization (EM) algorithm initializiation function """
-    def emInit(self, mfcc):
-        # Initialize transition matrix to be random with each row summing to 1
-        M = np.random.rand(self.N,self.N)
-        self.A = M/M.sum(axis=1)[:,None]
-        
-        subset = self.randState.choice(np.arange(mfcc.shape[0]), size=self.N, replace=True)
-        self.mu = mfcc[:, subset]
-    
-        C = np.zeros((mfcc.shape[0], mfcc.shape[0], self.N))
-        C += np.diag(np.diag(np.cov(mfcc)))[:, :, None]
-        
-        self.covs = np.zeros((mfcc.shape[0], mfcc.shape[0], self.N))
-        self.covs += np.diag(np.diag(np.cov(mfcc)))[:, :, None]
-
-
-    
+   
     """ Calculate the forward recursion, backward recursion, gamma, and xi """
-    def recursion(self, B):
-        logLikelihood = 0.
-        T = B.shape[1]
-        alpha = np.zeros(B.shape)
+    def alphaRecursion(self, B):
+        alpha = np.zeros((self.Q,self.T))
+        alpha[:,0] = B[:,0] * self.alphaPrev
+        logLikelihood = np.log(np.sum(alpha[:,0]))
+        alpha[:,0] /= np.sum(alpha[:,0])
+        for t in range(1,self.T):
+            alpha[:,t] = B[:,t] * np.dot(self.A, alpha[:,t-1])
+            logLikelihood += np.log(np.sum(alpha[:,t]))
+            alpha[:,t] /= np.sum(alpha[:,t])
+        return logLikelihood, alpha
+    
+    def betaRecursion(self, B):
         beta = np.zeros(B.shape)
-        gamma = np.zeros(B.shape)
-        xi = np.zeros((self.N,self.N))
-        
-        # First calculate beta
-        beta[:, T-1] = np.ones(self.N)
-        for t in range(T-2,-1,-1):
+        beta[:, self.T-1] = np.ones(self.Q)
+        for t in range(self.T-2,-1,-1):
             beta[:, t] = np.sum(beta[:, t + 1] * B[:, t + 1] * self.A,axis=1)
             beta[:, t] /= np.sum(beta[:, t])
-        
-        # Then compute the rest of the parameters
-        for t in range(T):
-            if t == 0:
-                alpha[:, t] = B[:, t] * self.prior.ravel()
-            else:
-                #alpha[:, t] = B[:, t] * np.sum(self.A * alpha[:, t - 1],axis=1)
-                alpha[:, t] = B[:, t] * np.dot(self.A.T, alpha[:, t - 1])
-            
-            logLikelihood += np.log(np.sum(alpha[:, t]))
-            alpha[:,t] /= np.sum(alpha[:,t])
-            
-            gamma[:,t] = alpha[:,t] * beta[:,t] / np.sum(alpha[:,t]*beta[:,t])
-            
-            #xiTmp[:,:,t] = B[:,t] * beta[:,t] * self.A * alpha[:,t-1]
-            if t == 0:
-                xiTmp = self.A * np.dot(self.prior.ravel(), (beta[:, t] * B[:, t]).T)
-            else:
-                xiTmp = self.A * np.dot(alpha[:, t-1], (beta[:, t] * B[:, t]).T)
-            xi += self._normalize(xiTmp)
-        return alpha, beta, gamma, xi, logLikelihood
-    
-    def _forward(self, B):
-        log_likelihood = 0.
-        T = B.shape[1]
-        alpha = np.zeros(B.shape)
-        for t in range(T):
-            if t == 0:
-                alpha[:, t] = B[:, t] * self.prior.ravel()
-            else:
-                alpha[:, t] = B[:, t] * np.dot(self.A.T, alpha[:, t - 1])
-         
-            alpha_sum = np.sum(alpha[:, t])
-            alpha[:, t] /= alpha_sum
-            log_likelihood = log_likelihood + np.log(alpha_sum)
-        return log_likelihood, alpha
-    
-    def _backward(self, B):
-        T = B.shape[1]
-        beta = np.zeros(B.shape);
-           
-        beta[:, -1] = np.ones(B.shape[0])
-            
-        for t in range(T - 1)[::-1]:
-            beta[:, t] = np.dot(self.A, (B[:, t + 1] * beta[:, t + 1]))
-            beta[:, t] /= np.sum(beta[:, t])
         return beta
-    
-    """ Expectation-Maximization algorithm """
-    def em(self, Dw):
-        w = Dw.shape[0]
-        T = Dw.shape[1]
-        if np.array(Dw.shape).size > 2:
-            numDataSets = Dw.shape[2]
-        else:
-            numDataSets = 1
-            
-        for L in range(0, numDataSets):
-            if np.array(Dw.shape).size > 2:            
-                p = hmm.stateLikelihood(self, Dw[:,:,L])
-            else:
-                p = hmm.stateLikelihood(self, Dw)
-            alpha, beta, gamma, xi, logLikelihood = hmm.recursion(self, p)
-            self.A = np.sum(xi) / np.sum(gamma,axis=0)
-            #self.A = hmm._stochasticize(self, xi)
-            
-            # Zero out elements in matrix A to make the state transitions only
-            # left to right
-            for i in range(0,self.N):
-                for j in range(0,self.N):
-                    if j > i + 1 or j < i:
-                        self.A[i,j] = 0
-            
-#            for q in range(0,self.N): # iterate over the number of states
-#                if np.array(Dw.shape).size > 2:
-#                    self.mu[:,q] += np.sum(Dw[:,:,L]*gamma[q,:])/np.sum(gamma[q,:])
-#                else:
-#                    self.mu[:,q] += np.sum(Dw*gamma[q,:],axis=1)/np.sum(gamma[q,:])
-#                    #self.mu[:,q] /= np.sum(self.mu[:,q]) # Normalize mu to avoid underflow
-#                
-#                if np.array(Dw.shape).size > 2:
-#                    self.C[:,:,q] += np.diag(np.sum((Dw[:,:,L]-np.reshape(self.mu[:,q],(w,1)))*
-#                            (Dw[:,:,L]-np.reshape(self.mu[:,q],(w,1)))*gamma[q,:],axis=1)/
-#                            np.sum(gamma[q,:]))
-#                else:
-#                    self.C[:,:,q] += np.diag(np.sum((Dw-np.reshape(self.mu[:,q],(w,1)))*
-#                            (Dw-np.reshape(self.mu[:,q],(w,1)))*gamma[q,:],axis=1)/
-#                            np.sum(gamma[q,:]))
-            
-            gamma_state_sum = np.sum(gamma, axis=1)
-            for q in range(self.N):
-                if np.array(Dw.shape).size > 2:
-                    gamma_obs = Dw[:,:,L] * gamma[q, :]
-                else:
-                    gamma_obs = Dw * gamma[q, :]
-                self.mu[:, q] = np.sum(gamma_obs, axis=1) / gamma_state_sum[q]
-                #self.C = np.dot(gamma_obs, Dw.T) / gamma_state_sum[q] - np.dot(self.mu[:, q], self.mu[:, q].T)
-                #Symmetrize
-                #self.C = np.triu(self.C) + np.triu(self.C).T - np.diag(self.C)
-                if np.array(Dw.shape).size > 2:
-                    self.C[:,:,q] += np.diag(np.sum((Dw[:,:,L]-np.reshape(self.mu[:,q],(w,1)))*
-                            (Dw[:,:,L]-np.reshape(self.mu[:,q],(w,1)))*gamma[q,:],axis=1)/
-                            np.sum(gamma[q,:]))
-                else:
-                    self.C[:,:,q] += np.diag(np.sum((Dw-np.reshape(self.mu[:,q],(w,1)))*
-                            (Dw-np.reshape(self.mu[:,q],(w,1)))*gamma[q,:],axis=1)/
-                            np.sum(gamma[q,:]))
-            # Ensure positive semidefinite by adding diagonal loading
-            self.C = self.C + .01 * np.eye(Dw.shape[0])[:, :, None]
-                
-    def _normalize(self, x):
+        
+    def normalize(self, x):
         return (x + (x == 0)) / np.sum(x)
     
-    def _stochasticize(self, x):
+    def stochasticize(self, x):
         return (x + (x == 0)) / np.sum(x, axis=1)
+    
+    def odessaInit(self, x, numDataSets):
+        self.numCoef = x.shape[0] # Number of MFCC coefficients
+        
+        self.T       = x.shape[1] # Number of MFCC vectors
+        
+        self.L = numDataSets # Number of data sets
+        
+        self.randState = np.random.RandomState(0)
+        
+        self.A = self.stochasticize(self.randState.rand(self.Q, self.Q))
+        
+        self.xiSum = np.zeros((self.Q,self.Q))
+        
+        # Initialize mu
+        self.mu = np.zeros((self.numCoef,self.Q))
+        subset = self.randState.choice(np.arange(self.numCoef), size=self.Q, replace=True)
+        self.mu = x[:, subset]
+        
+        self.C = np.zeros((self.numCoef, self.numCoef, self.Q))
+        self.C += np.diag(np.diag(np.cov(x)))[:, :, None]
+        
+        # Initialize the state likelihoood matrix p(x_t | Q_t = q)
+        self.B = np.zeros((self.Q, self.T))
+        
+        self.alphaPrev = self.randState.rand(self.Q)
+        self.alphaPrev /= np.sum(self.alphaPrev)
+        self.alpha = np.zeros((self.Q,self.T))
+        
+        
+        self.beta = np.zeros((self.Q,self.T))
+        
+        self.gamma = np.zeros((self.Q, self.T))
+        
+        self.xi = np.zeros((self.Q,self.Q,self.T))
+        
+        if self.L > 1:
+            self.gamma = np.zeros((self.Q, self.T,self.L))
+            self.xi = np.zeros((self.Q,self.Q,self.T,self.L))
+        else:
+            self.gamma = np.zeros((self.Q, self.T))
+            self.xi = np.zeros((self.Q,self.Q,self.T))
+    
+    """ Expectation-Maximization algorithm """
+    def em(self, x):        
+        B = hmm.pathWeights(self, x)    
+        
+        A = self.A
+         
+        logLikelihood, alpha = hmm.alphaRecursion(self, B)
+        beta = hmm.betaRecursion(self, B)
+        #logLikelihood, alpha = hmm._forward(self, B)
+        #beta = hmm._backward(self, B)
+        
+        #logLikelihood, alpha = hmm._forward(self, B)
+        #beta = hmm.betaRecursion(self, B)
+        
+        # Calculate gamma
+        gamma = np.zeros((self.Q, self.T))
+        for t in range(self.T):
+            for q in range(self.Q):
+                gammaSum = 0
+                for qq in range(self.Q):
+                    gammaSum += alpha[qq,t] * beta[qq,t]
+                gamma[q,t] = alpha[q,t]*beta[q,t] / gammaSum
+            
+        
+        # Calculate xi
+        pEvidence = np.zeros(self.T)
+        for t in range(self.T):
+            for q in range(self.Q):
+                pEvidence[t] += alpha[q,t]*beta[q,t]
+        
+        xi = np.zeros((self.Q,self.Q,self.T))
+        self.xiSum = np.zeros((self.Q,self.Q))
+        for t in range(self.T-1):
+            xi[:,:,t] = hmm.normalize(self, np.dot(alpha[:,t], (beta[:,t] * B[:,t+1]).T) * A / pEvidence[t])
+            self.xiSum += xi[:,:,t]
+            
+        # Update A
+        for i in range(self.Q):
+            for j in range(self.Q):
+                numA = 0
+                denA = 0
+                for t in range(self.T):
+                    numA += xi[i,j,t]
+                    denA += gamma[i,t]
+                A[i,j] = numA/denA
+
                 
-    def _em_step(self, obs): 
-        obs = np.atleast_2d(obs)
-        B = self.stateLikelihood(obs)
-        T = obs.shape[1]
+        # Update mu
+        mu = np.zeros((self.numCoef,self.Q))
+        for q in range(self.Q):
+            numMu = 0
+            denMu = 0
+            for t in range(self.T):
+                numMu += x[:,t] *  gamma[q,t]
+                denMu += gamma[q,t]
+            mu[:,q] = numMu / denMu # + 0.01 * np.random.rand(self.numCoef)
+            
+        # Update C
+        C = np.zeros((self.numCoef, self.numCoef, self.Q))
+        for q in range(self.Q):
+            numC = 0
+            denC = 0
+            for t in range(self.T):
+                numC += (x[:,t]-mu[:,q]) * (x[:,t]-mu[:,q]) * gamma[q,t]
+                denC += gamma[q,t]
+            for c in range(self.numCoef):
+                C[c,c,q] = numC[c] / denC
+                
+        # Update state variables
+        self.alpha = alpha
+        self.beta  = beta
+        self.gamma = gamma
+        self.xi    = xi
+        self.A     = A
+        self.mu    = mu
+        self.C     = C
+        self.B     = B
         
-        self.n_dims = obs.shape[0]
+        return logLikelihood
+    
+    """ Expectation-Maximization algorithm """
+    def em2(self, x):
+        A = self.A
+        gamma = np.zeros((self.Q, self.T,self.L))
+        xi = np.zeros((self.Q,self.Q,self.T,self.L))
+        for l in range(self.L):        
+            B = hmm.pathWeights(self, x[:,:,l])    
+         
+            logLikelihood, alpha = hmm.alphaRecursion(self, B)
+            beta = hmm.betaRecursion(self, B)
+            
+            # Calculate gamma
+            for t in range(self.T):
+                for q in range(self.Q):
+                    gammaSum = 0
+                    for qq in range(self.Q):
+                        gammaSum += alpha[qq,t] * beta[qq,t]
+                    gamma[q,t,l] = alpha[q,t]*beta[q,t] / gammaSum
+            
         
-        #log_likelihood, alpha = self._forward(B)
-        #beta = self._backward(B)
+            # Calculate xi
+            pEvidence = np.zeros(self.T)
+            for t in range(self.T):
+                for q in range(self.Q):
+                    pEvidence[t] += alpha[q,t]*beta[q,t]
         
-        alpha, beta, gamma, xi, log_likelihood = hmm.recursion(self, B)
+            for t in range(self.T-1):
+                xi[:,:,t,l] = hmm.normalize(self, np.dot(alpha[:,t], (beta[:,t] * B[:,t+1]).T) * A / pEvidence[t])
+            
+        # Update A
+        for i in range(self.Q):
+            for j in range(self.Q):
+                numA = 0
+                denA = 0
+                for l in range(self.L):
+                    for t in range(self.T):
+                        numA += xi[i,j,t,l]
+                        denA += gamma[i,t,l]
+                A[i,j] = numA/denA
+                
+        # Update mu
+        mu = np.zeros((self.numCoef,self.Q))
+        for q in range(self.Q):
+            numMu = 0
+            denMu = 0
+            for l in range(self.L):
+                for t in range(self.T):
+                    numMu += x[:,t,l] *  gamma[q,t,l]
+                    denMu += gamma[q,t,l]
+            mu[:,q] = numMu / denMu # + 0.01 * np.random.rand(self.numCoef)
+            
+        # Update C
+        C = np.zeros((self.numCoef, self.numCoef, self.Q))
+        for q in range(self.Q):
+            numC = 0
+            denC = 0
+            for l in range(self.L):
+                for t in range(self.T):
+                    numC += (x[:,t,l]-mu[:,q]) * (x[:,t,l]-mu[:,q]) * gamma[q,t,l]
+                    denC += gamma[q,t,l]
+            for c in range(self.numCoef):
+                C[c,c,q] = numC[c] / denC
+                
+        # Update state variables
+        self.alpha = alpha
+        self.beta  = beta
+        self.gamma = gamma
+        self.xi   = xi
+        self.A     = A
+        self.mu    = mu
+        self.C     = C
         
-        xi_sum = np.zeros((self.n_states, self.n_states))
-        gamma = np.zeros((self.n_states, T))
-        
-        for t in range(T - 1):
-            partial_sum = self.A * np.dot(alpha[:, t], (beta[:, t] * B[:, t + 1]).T)
-            xi_sum += self._normalize(partial_sum)
-            partial_g = alpha[:, t] * beta[:, t]
-            gamma[:, t] = self._normalize(partial_g)
-              
-        partial_g = alpha[:, -1] * beta[:, -1]
-        gamma[:, -1] = self._normalize(partial_g)
-        
-        expected_prior = gamma[:, 0]
-        expected_A = self._stochasticize(xi_sum)
-        
-        expected_mu = np.zeros((self.n_dims, self.n_states))
-        expected_covs = np.zeros((self.n_dims, self.n_dims, self.n_states))
-        
-        gamma_state_sum = np.sum(gamma, axis=1)
-        #Set zeros to 1 before dividing
-        gamma_state_sum = gamma_state_sum + (gamma_state_sum == 0)
-        
-        for s in range(self.n_states):
-            gamma_obs = obs * gamma[s, :]
-            expected_mu[:, s] = np.sum(gamma_obs, axis=1) / gamma_state_sum[s]
-            partial_covs = np.dot(gamma_obs, obs.T) / gamma_state_sum[s] - np.dot(expected_mu[:, s], expected_mu[:, s].T)
-            #Symmetrize
-            partial_covs = np.triu(partial_covs) + np.triu(partial_covs).T - np.diag(partial_covs)
-        
-        #Ensure positive semidefinite by adding diagonal loading
-        expected_covs = partial_covs + .01 * np.eye(self.n_states)[:, :, None]
-        
-#        # Zero out elements in matrix A to make the state transitions only
-#        # left to right
-#        for i in range(0,self.n_states):
-#            for j in range(0,self.n_states):
-#                if j > i + 1 or j < i:
-#                    expected_A[i,j] = 0
-        
-        self.prior = expected_prior
-        self.mu = expected_mu
-        self.covs = expected_covs
-        self.A = expected_A
-        
-        self.testGamma = gamma
-        self.testXi = xi_sum
-        
-        
-        return log_likelihood
+        return logLikelihood
+    
     
     """ A function to train the HMM on a sequence of data """
-    def train(self, Dw):
-        if np.array(Dw.shape).size > 2:
-            hmm.emInit(self, Dw[:,:,0])
+    def train(self, Dw, numIter):
+        if len(Dw.shape) > 2: # More than 1 mfcc set
+            hmm.odessaInit(self, Dw[:,:,0], Dw.shape[2])
         else:
-            hmm.emInit(self, Dw)
-        for i in range(0,15):
-            print("Iteration number " + str(i))
-            #hmm._em_step(self, Dw)
-            hmm.em(self, Dw)
+            hmm.odessaInit(self, Dw, 1)
+        conv = np.zeros(numIter)
+        for i in range(0,numIter):
+            print("Iteration ",i)
+            if self.L > 1:
+                conv[i] = hmm.em2(self, Dw)
+            else:
+                conv[i] = hmm.em(self, Dw)
+        return conv
+    
+    """ A function to save the trained state transition matrix
+        for use with the HMM """
+    def saveData(self, hmmName):
+        if not os.path.exists("state/" + hmmName):
+            os.makedirs("state/" + hmmName)
+        np.save("state/" + hmmName + "/A", self.A)
+        np.save("state/" + hmmName + "/mu",self.mu)
+        np.save("state/" + hmmName + "/C",self.C)
+        
+    """ A function to load the trained state transition matrix
+        for use with the HMM """
+    def loadData(self, hmmName):
+        self.A = np.load("state/" + hmmName + "/A.npy")
+        self.mu = np.load("state/" + hmmName + "/mu.npy")
+        self.C = np.load("state/" + hmmName + "/C.npy")
+            

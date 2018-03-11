@@ -4,7 +4,7 @@ import numpy as np
 import scipy.io.wavfile
 from scipy.fftpack import dct
 import scipy.stats as st
-import odessa2
+import odessa
 
 plt.close('all')
             
@@ -12,7 +12,7 @@ def loadWavData(phrase, frameSize, skipSize, numCoef, numDataSets):
     # Load some training wav files to get MFCC training data
     FILENAME = "audio/test/" + phrase + ".wav" # Name of wav file
     fs, wavData = scipy.io.wavfile.read(FILENAME)    
-    Dw = odessa2.mfcc.getMfcc(wavData, fs, frameSize, skipSize, numCoef)
+    Dw = odessa.mfcc.getMfcc(wavData, fs, frameSize, skipSize, numCoef)
     
     return Dw
 
@@ -25,7 +25,7 @@ def recordAudio(frameSize, skipSize, numCoef):
     myrec = sd.rec(int(duration * fs), samplerate=fs, channels=CHANNELS)
     sd.wait()
     print('Recording stop')
-    mfcc = odessa2.mfcc.getMfcc(np.reshape(myrec, len(myrec)), fs, frameSize, skipSize, numCoef)
+    mfcc = odessa.mfcc.getMfcc(np.reshape(myrec, len(myrec)), fs, frameSize, skipSize, numCoef)
     return mfcc
 
 
@@ -55,32 +55,32 @@ if __name__ == "__main__":
     
     """ Odessa HMM """
     
-    OdessaHmm = odessa2.hmm(8, leftToRight, numDataSets)
+    OdessaHmm = odessa.hmm(8, leftToRight, numDataSets)
     OdessaHmm.loadData("odessa")
     
     """ Play Music HMM """
     
-    PlayMusicHmm = odessa2.hmm(8, leftToRight, numDataSets)
+    PlayMusicHmm = odessa.hmm(8, leftToRight, numDataSets)
     PlayMusicHmm.loadData("PlayMusic")
     
     """ Stop Music HMM """
     
-    StopMusicHmm = odessa2.hmm(9, leftToRight, numDataSets)
+    StopMusicHmm = odessa.hmm(9, leftToRight, numDataSets)
     StopMusicHmm.loadData("StopMusic")
     
     """ Turn Off The Lights HMM """
     
-    TurnOffTheLightsHmm = odessa2.hmm(9, leftToRight, numDataSets)
+    TurnOffTheLightsHmm = odessa.hmm(9, leftToRight, numDataSets)
     TurnOffTheLightsHmm.loadData("TurnOffTheLights")
     
     """ Turn On The Lights HMM """
     
-    TurnOnTheLightsHmm = odessa2.hmm(9, leftToRight, numDataSets)
+    TurnOnTheLightsHmm = odessa.hmm(9, leftToRight, numDataSets)
     TurnOnTheLightsHmm.loadData("TurnOnTheLights")
     
     """ What Time Is It HMM """
     
-    WhatTimeIsItHmm = odessa2.hmm(9, leftToRight, numDataSets)
+    WhatTimeIsItHmm = odessa.hmm(9, leftToRight, numDataSets)
     WhatTimeIsItHmm.loadData("WhatTimeIsIt")
     
     probOdessa, llOdessa, alphaOdessa, betaOdessa, Bodessa = OdessaHmm.probEvidence(mfcc)
