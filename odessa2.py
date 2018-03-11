@@ -160,13 +160,15 @@ class hmm:
 
     """ Function to calculate the path weight matrix p(x_t | Q_t = q) """
     def pathWeights(self, x):
+        self.numCoef = x.shape[0]
+        self.T = x.shape[1]
         B = np.zeros((self.Q, self.T))
         for t in range(self.T):
             for q in range(self.Q):
                 exponent = 0
                 for c in range(self.numCoef):
                     exponent += (x[c,t]-self.mu[c,q]) * 1/self.C[c,c,q] * (x[c,t]-self.mu[c,q])
-                    B[q,t] = 1/np.sqrt(np.linalg.det(2*np.pi*self.C[:,:,q]))*np.exp(-1/2 * exponent)
+                B[q,t] = 1/np.sqrt(np.linalg.det(2*np.pi*self.C[:,:,q]))*np.exp(-1/2 * exponent)
                 
 #        x = np.atleast_2d(x)
 #        for s in range(self.Q):
@@ -214,15 +216,12 @@ class hmm:
     def stochasticize(self, x):
         return (x + (x == 0)) / np.sum(x, axis=1)
     
-    def odessaInit(self, x):
+    def odessaInit(self, x, numDataSets):
         self.numCoef = x.shape[0] # Number of MFCC coefficients
         
         self.T       = x.shape[1] # Number of MFCC vectors
         
-        if len(x.shape) > 2:
-            self.L = x.shape[2] # Number of data sets
-        else:
-            self.L = 1
+        self.L = numDataSets # Number of data sets
         
         self.randState = np.random.RandomState(0)
         
@@ -440,9 +439,9 @@ class hmm:
     """ A function to train the HMM on a sequence of data """
     def train(self, Dw, numIter):
         if len(Dw.shape) > 2: # More than 1 mfcc set
-            hmm.odessaInit(self, Dw[:,:,0])
+            hmm.odessaInit(self, Dw[:,:,0], Dw.shape[2])
         else:
-            hmm.odessaInit(self, Dw)
+            hmm.odessaInit(self, Dw, 1)
         conv = np.zeros(numIter)
         for i in range(0,numIter):
             print("Iteration ",i)
