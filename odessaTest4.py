@@ -33,7 +33,7 @@ def inithmm(hmmName, numHmmStates, frameSize, skipSize, numCoef, numDataSets, nu
     #d1 = np.random.rand(ydim, xdim)
     
     # Initialize the  HMM
-    hmm = odessa2.hmm(numHmmStates, mfcc, leftToRight)
+    hmm = odessa2.hmm(numHmmStates, leftToRight, numDataSets)
     
     # Train the HMM
     print("Training the ",hmmName," HMM")
@@ -63,85 +63,85 @@ if __name__ == "__main__":
     
     """ Odessa HMM """
     
-    OdessaConv, OdessaHmm, OdessaMfcc = inithmm("odessa", 6, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
+    OdessaConv, OdessaHmm, OdessaMfcc = inithmm("odessa", 8, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
     
     """ Play Music HMM """
     
-    PlayMusicConv, PlayMusicHmm, PlayMusicMfcc = inithmm("PlayMusic", 15, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
+    #PlayMusicConv, PlayMusicHmm, PlayMusicMfcc = inithmm("PlayMusic", 15, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
     
     """ Stop Music HMM """
     
-    StopMusicConv, StopMusicHmm, StopMusicMfcc = inithmm("StopMusic", 15, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
+    #StopMusicConv, StopMusicHmm, StopMusicMfcc = inithmm("StopMusic", 15, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
     
     """ Turn Off The Lights HMM """
     
-    TurnOffTheLightsConv, TurnOffTheLightsHmm, TurnOffTheLightsMfcc = inithmm("TurnOffTheLights", 20, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
+    #TurnOffTheLightsConv, TurnOffTheLightsHmm, TurnOffTheLightsMfcc = inithmm("TurnOffTheLights", 20, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
     
     """ Turn On The Lights HMM """
     
-    TurnOnTheLightsConv, TurnOnTheLightsHmm, TurnOnTheLightsMfcc = inithmm("TurnOnTheLights", 20, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
+    #TurnOnTheLightsConv, TurnOnTheLightsHmm, TurnOnTheLightsMfcc = inithmm("TurnOnTheLights", 20, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
     
     """ What Time Is It HMM """
     
-    WhatTimeIsItConv, WhatTimeIsItHmm, WhatTimeIsItMfcc = inithmm("WhatTimeIsIt", 15, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
+    #WhatTimeIsItConv, WhatTimeIsItHmm, WhatTimeIsItMfcc = inithmm("WhatTimeIsIt", 15, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight)
     
     plt.figure()
     plt.plot(OdessaConv)    
-    plt.plot(PlayMusicConv)
-    plt.plot(StopMusicConv)
-    plt.plot(TurnOffTheLightsConv)
-    plt.plot(TurnOnTheLightsConv)
-    plt.plot(WhatTimeIsItConv)
+    #plt.plot(PlayMusicConv)
+    #plt.plot(StopMusicConv)
+    #plt.plot(TurnOffTheLightsConv)
+    #plt.plot(TurnOnTheLightsConv)
+    #plt.plot(WhatTimeIsItConv)
     
     
-    data = OdessaMfcc
-    #data = PlayMusicMfcc
-    #data = StopMusicMfcc
-    #data = TurnOffTheLightsMfcc
-    #data = TurnOnTheLightsMfcc
-    #data = WhatTimeIsItMfcc
-    
-    probOdessa, llOdessa, alphaOdessa, betaOdessa, Bodessa = OdessaHmm.probEvidence(data)
-    probPlayMusic, llPlayMusic, alphaPlayMusic, betaPlayMusic, BplayMusic = PlayMusicHmm.probEvidence(data)
-    probStopMusic, llStopMusic, alphaStopMusic, betaStopMusic, BstopMusic = StopMusicHmm.probEvidence(data)
-    probTurnOffTheLights, llTurnOffTheLights, alphaTurnOffTheLights, betaTurnOffTheLights, BturnOffTheLights = TurnOffTheLightsHmm.probEvidence(data)
-    probTurnOnTheLights, llTurnOnTheLights, alphaTurnOnTheLights, betaTurnOnTheLights, BturnOnTheLights = TurnOnTheLightsHmm.probEvidence(data)
-    probWhatTimeIsIt, llWhatTimeIsIt, alphaWhatTimeIsIt, betaTurnOnTheLights, BwhatTimeIsIt = WhatTimeIsItHmm.probEvidence(data) 
-    
-    
-    
-        
-    print("")
-    
-    print("Odessa HMM: ",llOdessa)
-    print("Play Music HMM: ",llPlayMusic)
-    print("Stop Music HMM: ",llStopMusic)
-    print("Turn Off The Lights HMM: ",llTurnOffTheLights)
-    print("Turn On The Lights HMM: ",llTurnOnTheLights)
-    print("What Time Is It HMM: ",llWhatTimeIsIt)
-    
-    
-    print("")
-    
-    results = np.array([[llOdessa, llPlayMusic, llStopMusic, llTurnOffTheLights, llTurnOnTheLights, llWhatTimeIsIt]])
-    idx = np.argmax(results)
-    
-    if idx == 0:
-        print("Odessa")
-    elif idx == 1:
-        print("Play music")
-    elif idx == 2:
-        print("Stop music")
-    elif idx == 3:
-        print("Turn off the lights")
-    elif idx == 4:
-        print("Turn on the lights")
-    elif idx == 5:
-        print("What time is it")
-    else:
-        print("Error")
-        
-    print("")
+#    data = OdessaMfcc
+#    #data = PlayMusicMfcc
+#    #data = StopMusicMfcc
+#    #data = TurnOffTheLightsMfcc
+#    #data = TurnOnTheLightsMfcc
+#    #data = WhatTimeIsItMfcc
+#    
+#    probOdessa, llOdessa, alphaOdessa, betaOdessa, Bodessa = OdessaHmm.probEvidence(data)
+#    probPlayMusic, llPlayMusic, alphaPlayMusic, betaPlayMusic, BplayMusic = PlayMusicHmm.probEvidence(data)
+#    probStopMusic, llStopMusic, alphaStopMusic, betaStopMusic, BstopMusic = StopMusicHmm.probEvidence(data)
+#    probTurnOffTheLights, llTurnOffTheLights, alphaTurnOffTheLights, betaTurnOffTheLights, BturnOffTheLights = TurnOffTheLightsHmm.probEvidence(data)
+#    probTurnOnTheLights, llTurnOnTheLights, alphaTurnOnTheLights, betaTurnOnTheLights, BturnOnTheLights = TurnOnTheLightsHmm.probEvidence(data)
+#    probWhatTimeIsIt, llWhatTimeIsIt, alphaWhatTimeIsIt, betaTurnOnTheLights, BwhatTimeIsIt = WhatTimeIsItHmm.probEvidence(data) 
+#    
+#    
+#    
+#        
+#    print("")
+#    
+#    print("Odessa HMM: ",llOdessa)
+#    print("Play Music HMM: ",llPlayMusic)
+#    print("Stop Music HMM: ",llStopMusic)
+#    print("Turn Off The Lights HMM: ",llTurnOffTheLights)
+#    print("Turn On The Lights HMM: ",llTurnOnTheLights)
+#    print("What Time Is It HMM: ",llWhatTimeIsIt)
+#    
+#    
+#    print("")
+#    
+#    results = np.array([[llOdessa, llPlayMusic, llStopMusic, llTurnOffTheLights, llTurnOnTheLights, llWhatTimeIsIt]])
+#    idx = np.argmax(results)
+#    
+#    if idx == 0:
+#        print("Odessa")
+#    elif idx == 1:
+#        print("Play music")
+#    elif idx == 2:
+#        print("Stop music")
+#    elif idx == 3:
+#        print("Turn off the lights")
+#    elif idx == 4:
+#        print("Turn on the lights")
+#    elif idx == 5:
+#        print("What time is it")
+#    else:
+#        print("Error")
+#        
+#    print("")
 #    
 #    
 #    

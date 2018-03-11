@@ -36,7 +36,7 @@ def inithmm(hmmName, numHmmStates, frameSize, skipSize, numCoef, numDataSets, nu
     #d1 = np.random.rand(ydim, xdim)
     
     # Initialize the  HMM
-    hmm = odessa2.hmm(numHmmStates, mfcc, leftToRight, numDataSets)
+    hmm = odessa2.hmm(numHmmStates, leftToRight, numDataSets)
     
     # Train the HMM
     print("Training the ",hmmName," HMM")
@@ -57,12 +57,7 @@ if __name__ == "__main__":
     
     leftToRight = 1 # Force the use of a left to right HMM model
     
-    ydim = 10
-    xdim = 100
-    
     numDataSets   = 10 
-    
-    numStates = 5
     
     numIter = 15 # number of EM algorithm iterations
     

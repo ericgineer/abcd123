@@ -14,15 +14,26 @@ def loadWavData(phrase, frameSize, skipSize, numCoef, numDataSets):
     Dw = odessa2.mfcc.getMfcc(wavData, fs, frameSize, skipSize, numCoef)
     return Dw
 
-def inithmm(hmmName, filename, numHmmStates, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight):
+def recordAudio():
+    duration = 3 # seconds
+    CHANNELS = 1
+    fs = 16000
+
+    print('Recording start')
+    myrec = sd.rec(int(duration * fs), samplerate=fs, channels=CHANNELS)
+    sd.wait()
+    print('Recording stop')
+    return myrec
+
+def inithmm(hmmName, filename, numHmmStates, wavData, frameSize, skipSize, numCoef, numDataSets, numIter, leftToRight):
     # Load training data
-    Dw = loadWavData(filename, frameSize, skipSize, numCoef, 1)
-    mfcc = Dw # / np.max(np.abs(Dw1))
+    #Dw = loadWavData(filename, frameSize, skipSize, numCoef, 1)
+    #mfcc = Dw # / np.max(np.abs(Dw1))
     #np.random.seed(0)
     #d1 = np.random.rand(ydim, xdim)
-    
+    mfcc = odessa2.mfcc.getMfcc(wavData, fs, frameSize, skipSize, numCoef)
     # Initialize the  HMM
-    hmm = odessa2.hmm(numHmmStates, mfcc, leftToRight, numDataSets)
+    hmm = odessa2.hmm(numHmmStates, numCoef, leftToRight, numDataSets)
     
     hmm.loadData(hmmName)
     return hmm, mfcc
@@ -47,6 +58,8 @@ if __name__ == "__main__":
     numStates = 5
     
     numIter = 15 # number of EM algorithm iterations
+    
+    
     
     """ Odessa HMM """
     

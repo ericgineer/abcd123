@@ -113,19 +113,14 @@ class mfcc:
 
 class hmm:
     """ A class to implement a HMM for speech recognition """
-    def __init__(self, numStates, mfcc, leftToRight, numDataSets):
+    def __init__(self, numStates, leftToRight, numDataSets):
         """ Initialize HMM variables """
         self.Q = numStates  # Number of states to use in the HMM
                             # (should be the number of phonenems in the phrase)
-                            
-        self.numCoef = mfcc.shape[0] # Number of MFCC coefficients
-        self.T       = mfcc.shape[1] # Number of MFCC vectors
         
         self.randState = np.random.RandomState(0)
         
         self.leftToRight = leftToRight
-        
-        self.L = numDataSets
         
         #self.A = self.stochasticize(self.randState.rand(self.Q, self.Q))
         
@@ -149,40 +144,29 @@ class hmm:
         
         self.xiSum = np.zeros((self.Q,self.Q))
         
-        # Initialize mu
-        self.mu = np.zeros((self.numCoef,self.Q))
-        subset = self.randState.choice(np.arange(self.numCoef), size=self.Q, replace=True)
-        self.mu = mfcc[:, subset]
+        self.mu = []
         
-        self.C = np.zeros((self.numCoef, self.numCoef, self.Q))
-        self.C += np.diag(np.diag(np.cov(mfcc)))[:, :, None]
+        self.C = []
         
         # Initialize the state likelihoood matrix p(x_t | Q_t = q)
-        self.B = np.zeros((self.Q, self.T))
+        self.B = []
         
         self.alphaPrev = self.randState.rand(self.Q)
         self.alphaPrev /= np.sum(self.alphaPrev)
-        self.alpha = np.zeros((self.Q,self.T))
         
+        self.alpha = []
         
-        self.beta = np.zeros((self.Q,self.T))
-        
-        
-        if self.L > 1:
-            self.gamma = np.zeros((self.Q, self.T,self.L))
-            self.xi = np.zeros((self.Q,self.Q,self.T,self.L))
-        else:
-            self.gamma = np.zeros((self.Q, self.T))
-            self.xi = np.zeros((self.Q,self.Q,self.T))
+        self.beta = []
 
     """ Function to calculate the path weight matrix p(x_t | Q_t = q) """
     def pathWeights(self, x):
+        B = np.zeros((self.Q, self.T))
         for t in range(self.T):
             for q in range(self.Q):
                 exponent = 0
                 for c in range(self.numCoef):
                     exponent += (x[c,t]-self.mu[c,q]) * 1/self.C[c,c,q] * (x[c,t]-self.mu[c,q])
-                self.B[q,t] = 1/np.sqrt(np.linalg.det(2*np.pi*self.C[:,:,q]))*np.exp(-1/2 * exponent)
+                    B[q,t] = 1/np.sqrt(np.linalg.det(2*np.pi*self.C[:,:,q]))*np.exp(-1/2 * exponent)
                 
 #        x = np.atleast_2d(x)
 #        for s in range(self.Q):
@@ -190,7 +174,7 @@ class hmm:
 #            np.random.seed(self.random_state.randint(1))
 #            self.B[s, :] = st.multivariate_normal.pdf(
 #                x.T, mean=self.mu[:, s].T, cov=self.C[:, :, s].T)
-        return self.B
+        return B
     
     """ Calculate the probability of evidence p(x_1:T) """
     def probEvidence(self, mfcc):
@@ -231,6 +215,15 @@ class hmm:
         return (x + (x == 0)) / np.sum(x, axis=1)
     
     def odessaInit(self, x):
+        self.numCoef = x.shape[0] # Number of MFCC coefficients
+        
+        self.T       = x.shape[1] # Number of MFCC vectors
+        
+        if len(x.shape) > 2:
+            self.L = x.shape[2] # Number of data sets
+        else:
+            self.L = 1
+        
         self.randState = np.random.RandomState(0)
         
         self.A = self.stochasticize(self.randState.rand(self.Q, self.Q))
@@ -258,6 +251,13 @@ class hmm:
         self.gamma = np.zeros((self.Q, self.T))
         
         self.xi = np.zeros((self.Q,self.Q,self.T))
+        
+        if self.L > 1:
+            self.gamma = np.zeros((self.Q, self.T,self.L))
+            self.xi = np.zeros((self.Q,self.Q,self.T,self.L))
+        else:
+            self.gamma = np.zeros((self.Q, self.T))
+            self.xi = np.zeros((self.Q,self.Q,self.T))
     
     """ Expectation-Maximization algorithm """
     def em(self, x):        
@@ -349,10 +349,11 @@ class hmm:
         self.alpha = alpha
         self.beta  = beta
         self.gamma = gamma
-        self.xi   = xi
+        self.xi    = xi
         self.A     = A
         self.mu    = mu
         self.C     = C
+        self.B     = B
         
         return logLikelihood
     
@@ -438,7 +439,7 @@ class hmm:
     
     """ A function to train the HMM on a sequence of data """
     def train(self, Dw, numIter):
-        if self.L > 1:
+        if len(Dw.shape) > 2: # More than 1 mfcc set
             hmm.odessaInit(self, Dw[:,:,0])
         else:
             hmm.odessaInit(self, Dw)

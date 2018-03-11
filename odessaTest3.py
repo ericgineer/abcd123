@@ -34,12 +34,12 @@ if __name__ == "__main__":
     
     numDataSets   = 1 
     
-    ydim = 10
+    ydim = 4
     xdim = 40
     
     numDataSets   = 1 
     
-    numStates = 10
+    numStates = 2
     
     numIter = 15 # number of EM algorithm iterations
     
@@ -54,7 +54,7 @@ if __name__ == "__main__":
     d1 = np.random.rand(ydim, xdim)
     
     # Initialize the "Odessa" HMM
-    hmm1 = odessa2.hmm(numStates, d1, leftToRight)
+    hmm1 = odessa2.hmm(numStates, leftToRight, numDataSets)
     
     # Train the "Odessa" HMM
     conv1 = hmm1.train(d1, numIter)
@@ -67,7 +67,7 @@ if __name__ == "__main__":
     d2 = np.random.rand(ydim, xdim)
     
     # Initialize the "Odessa" HMM
-    hmm2 = odessa2.hmm(numStates, d2, leftToRight)
+    hmm2 = odessa2.hmm(numStates, leftToRight, numDataSets)
     
     # Train the "Odessa" HMM
     conv2 = hmm2.train(d2, numIter)
@@ -75,8 +75,8 @@ if __name__ == "__main__":
     
     data = d2
     
-    prob1, ll1, alpha1, B1 = hmm1.probEvidence(data)
-    prob2, ll2, alpha2, B2 = hmm2.probEvidence(data)
+    prob1, ll1, alpha1, beta1, B1 = hmm1.probEvidence(data)
+    prob2, ll2, alpha2, beta2, B2 = hmm2.probEvidence(data)
     
     print("hmm1: ",ll1)
     print("hmm2: ",ll2)
