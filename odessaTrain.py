@@ -57,7 +57,7 @@ if __name__ == "__main__":
     
     leftToRight = 1 # Force the use of a left to right HMM model
     
-    numDataSets   = 10 
+    numDataSets   = 20 
     
     numIter = 15 # number of EM algorithm iterations
     

@@ -11,7 +11,7 @@ myrec = sd.rec(int(duration * fs), samplerate=fs, channels=CHANNELS)
 sd.wait()
 print('Recording stop')
 
-filename = 'audio/WhatTimeIsIt/WhatTimeIsItTest.wav'
+filename = 'audio/WhatTimeIsIt/WhatTimeIsIt20.wav'
 
 scipy.io.wavfile.write(filename,fs,myrec)
 
