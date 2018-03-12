@@ -73,7 +73,7 @@ if __name__ == "__main__":
     conv2 = hmm2.train(d2, numIter)
     
     
-    data = d2
+    data = d1
     
     prob1, ll1, alpha1, beta1, B1 = hmm1.probEvidence(data)
     prob2, ll2, alpha2, beta2, B2 = hmm2.probEvidence(data)

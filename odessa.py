@@ -20,25 +20,17 @@ class mfcc:
     
     def silenceDetect(self, frame):        
         Es = np.sum(np.abs(frame)) # Calculate the energy in the frame
-        # Update shift register that holds previous values of Es
-        for i in range(0,self.pastFrames): 
-            if i == self.pastFrames-1:
-                self.pastEs[i] = Es
-            else:
-                self.pastEs[i] = self.pastEs[i+1]
         # Average the first <frameAv> frames with the assumption that there is 
         # no speech in them to get the threshold value
         if self.frameIdx < self.frameAv:
             self.thresholdEs += Es
             self.frameIdx += 1 # Update frame index counter
             return 0
-        elif (self.pastEs > self.thresholdEs).any() and self.frameIdx > self.pastFrames: 
-            self.frameIdx += 1 # Update frame index counter
+        elif (Es > self.thresholdEs).any(): 
             return 1
         else:
-            self.frameIdx += 1 # Update frame index counter
             return 0
-    
+
     
     """ A function to compute delta features of an MFCC vector """
     def deltaFeature(x, M, numCoef):
@@ -167,6 +159,13 @@ class hmm:
                 for c in range(self.numCoef):
                     exponent += (x[c,t]-self.mu[c,q]) * 1/self.C[c,c,q] * (x[c,t]-self.mu[c,q])
                 B[q,t] = 1/np.sqrt(np.linalg.det(2*np.pi*self.C[:,:,q]))*np.exp(-1/2 * exponent)
+                
+#        x = np.atleast_2d(x)
+#        for s in range(self.Q):
+#            #Needs scipy 0.14
+#            np.random.seed(self.random_state.randint(1))
+#            self.B[s, :] = st.multivariate_normal.pdf(
+#                x.T, mean=self.mu[:, s].T, cov=self.C[:, :, s].T)
         return B
     
     """ Calculate the probability of evidence p(x_1:T) """
@@ -281,6 +280,8 @@ class hmm:
         
         xi = np.zeros((self.Q,self.Q,self.T))
         self.xiSum = np.zeros((self.Q,self.Q))
+        #xi[:,:,0] = hmm.normalize(self, np.dot(self.alphaPrev, (beta[:,t] * B[:,t]).T) * A) # / pEvidence[0]
+        #self.xiSum = xi[:,:,0]
         for t in range(self.T-1):
             xi[:,:,t] = hmm.normalize(self, np.dot(alpha[:,t], (beta[:,t] * B[:,t+1]).T) * A / pEvidence[t])
             self.xiSum += xi[:,:,t]
@@ -294,6 +295,17 @@ class hmm:
                     numA += xi[i,j,t]
                     denA += gamma[i,t]
                 A[i,j] = numA/denA
+        
+        # Zero out un-needed A elements
+#        if self.leftToRight == 1:
+#            for i in range(0,self.Q):
+#                for j in range(0,self.Q):
+#                    if j < i:
+#                        A[i,j] = 0
+#                    elif i == 0 and j == 0:
+#                        A[i,j] = 0
+#                    elif j > i + 1:
+#                        A[i,j] = 0
 
                 
         # Update mu
@@ -316,6 +328,11 @@ class hmm:
                 denC += gamma[q,t]
             for c in range(self.numCoef):
                 C[c,c,q] = numC[c] / denC
+                
+#        expected_covs = np.zeros((self.numCoef, self.numCoef, self.Q))
+#        expected_covs += .01 * np.eye(self.numCoef)[:, :, None]
+#        for q in range(self.Q):
+#            C[:,:,q] += .01 * np.eye(self.numCoef)
                 
         # Update state variables
         self.alpha = alpha
@@ -391,6 +408,11 @@ class hmm:
                     denC += gamma[q,t,l]
             for c in range(self.numCoef):
                 C[c,c,q] = numC[c] / denC
+                
+#        expected_covs = np.zeros((self.numCoef, self.numCoef, self.Q))
+#        expected_covs += .01 * np.eye(self.numCoef)[:, :, None]
+#        for q in range(self.Q):
+#            C[:,:,q] += .01 * np.eye(self.numCoef)
                 
         # Update state variables
         self.alpha = alpha

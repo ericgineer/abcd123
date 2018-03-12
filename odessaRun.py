@@ -25,6 +25,7 @@ def recordAudio(frameSize, skipSize, numCoef):
     myrec = sd.rec(int(duration * fs), samplerate=fs, channels=CHANNELS)
     sd.wait()
     print('Recording stop')
+    sd.playrec(myrec, fs, channels=CHANNELS)
     mfcc = odessa.mfcc.getMfcc(np.reshape(myrec, len(myrec)), fs, frameSize, skipSize, numCoef)
     return mfcc
 
@@ -36,18 +37,9 @@ if __name__ == "__main__":
                    # and the start of the next frame
     numCoef   = 13 # Number of MFCC coefficients
     
-    numDataSets   = 1 
-    
     leftToRight = 0 # Force the use of a left to right HMM model
     
-    ydim = 10
-    xdim = 100
-    
-    numDataSets   = 10 
-    
-    numStates = 5
-    
-    numIter = 15 # number of EM algorithm iterations
+    numDataSets   = 0 
     
     
     """ Record some audio """
