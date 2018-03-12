@@ -15,18 +15,19 @@ class mfcc:
         self.frameAv = 10 # Number of frames to average for threshold calculation
         self.pastFrames = 15 # Number of past frames to use for threshold comparison
         self.pastEs = np.zeros(self.pastFrames)
+        self.Es = []
     
     """ Silence detection function """
     
     def silenceDetect(self, frame):        
-        Es = np.sum(np.abs(frame)) # Calculate the energy in the frame
+        self.Es = np.sum(np.abs(frame)) # Calculate the energy in the frame
         # Average the first <frameAv> frames with the assumption that there is 
         # no speech in them to get the threshold value
         if self.frameIdx < self.frameAv:
-            self.thresholdEs += Es
+            self.thresholdEs += self.Es
             self.frameIdx += 1 # Update frame index counter
             return 0
-        elif (Es > self.thresholdEs).any(): 
+        elif (self.Es > self.thresholdEs).any(): 
             return 1
         else:
             return 0
