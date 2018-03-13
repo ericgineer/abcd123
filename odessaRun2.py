@@ -54,7 +54,7 @@ if __name__ == "__main__":
                     frames_per_buffer=CHUNK)
         
     
-    numPrevFrames = 5 # Number of previous frames to append to the speech data    
+    numPrevFrames = 20 # Number of previous frames to append to the speech data    
     frames = np.zeros(CHUNK)
     prevFrames = np.zeros(numPrevFrames*CHUNK) # Number of previous frames to append
                                    # to the beginning of the speech data
@@ -107,6 +107,7 @@ if __name__ == "__main__":
             prevFrames[n*CHUNK:(n+1)*CHUNK] = prevFrames[(n+1)*CHUNK:(n+2)*CHUNK]
         isSpeech = speech.silenceDetect(data)
         if isSpeech == 1:
+            frames = np.zeros(CHUNK)
             print("Speech detected!")
             for q in range(int(RATE / CHUNK * 3)): # Capture 3 seconds of audio
                 if q == 0:
@@ -115,6 +116,8 @@ if __name__ == "__main__":
                     frames = np.append(frames, data)
                 dataByte = stream.read(CHUNK, exception_on_overflow = False)
                 data = np.fromstring(dataByte, 'Int16') / 32767
+            #frames = frames[0:frames.size-prevFrames.size] / np.max(frames[0:frames.size-prevFrames.size])
+            frames = frames / np.max(frames)
             sd.playrec(frames, RATE, channels=CHANNELS)
             mfccVect = odessa.mfcc.getMfcc(frames, RATE, mfccFrameSize, skipSize, numCoef)
             probOdessa, llOdessa, alphaOdessa, betaOdessa, Bodessa = OdessaHmm.probEvidence(mfccVect)
