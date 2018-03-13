@@ -74,32 +74,32 @@ if __name__ == "__main__":
     
     """ Odessa HMM """
         
-    OdessaHmm = odessa.hmm(8, leftToRight, numDataSets)
+    OdessaHmm = odessa.hmm(8, numDataSets)
     OdessaHmm.loadData("odessa")
     
     """ Play Music HMM """
     
-    PlayMusicHmm = odessa.hmm(8, leftToRight, numDataSets)
+    PlayMusicHmm = odessa.hmm(8, numDataSets)
     PlayMusicHmm.loadData("PlayMusic")
     
     """ Stop Music HMM """
     
-    StopMusicHmm = odessa.hmm(9, leftToRight, numDataSets)
+    StopMusicHmm = odessa.hmm(9, numDataSets)
     StopMusicHmm.loadData("StopMusic")
     
     """ Turn Off The Lights HMM """
     
-    TurnOffTheLightsHmm = odessa.hmm(9, leftToRight, numDataSets)
+    TurnOffTheLightsHmm = odessa.hmm(9, numDataSets)
     TurnOffTheLightsHmm.loadData("TurnOffTheLights")
     
     """ Turn On The Lights HMM """
     
-    TurnOnTheLightsHmm = odessa.hmm(9, leftToRight, numDataSets)
+    TurnOnTheLightsHmm = odessa.hmm(9, numDataSets)
     TurnOnTheLightsHmm.loadData("TurnOnTheLights")
     
     """ What Time Is It HMM """
     
-    WhatTimeIsItHmm = odessa.hmm(9, leftToRight, numDataSets)
+    WhatTimeIsItHmm = odessa.hmm(9, numDataSets)
     WhatTimeIsItHmm.loadData("WhatTimeIsIt")
     
     heardOdessa = 0  # Set to 1 if the phrase "Odessa" is recognized

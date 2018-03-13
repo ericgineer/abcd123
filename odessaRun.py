@@ -22,10 +22,10 @@ def recordAudio(frameSize, skipSize, numCoef):
     fs = 16000
 
     print('Recording start')
-    #myrec = sd.rec(int(duration * fs), samplerate=fs, channels=CHANNELS)
-    #sd.wait()
+    myrec = sd.rec(int(duration * fs), samplerate=fs, channels=CHANNELS)
+    sd.wait()
     print('Recording stop')
-    sd.playrec(myrec, fs, channels=CHANNELS)
+    #sd.playrec(myrec, fs, channels=CHANNELS)
     mfcc = odessa.mfcc.getMfcc(np.reshape(myrec, len(myrec)), fs, frameSize, skipSize, numCoef)
     return mfcc
 
@@ -47,32 +47,32 @@ if __name__ == "__main__":
     
     """ Odessa HMM """
     
-    OdessaHmm = odessa.hmm(8, leftToRight, numDataSets)
+    OdessaHmm = odessa.hmm(8, numDataSets)
     OdessaHmm.loadData("odessa")
     
     """ Play Music HMM """
     
-    PlayMusicHmm = odessa.hmm(8, leftToRight, numDataSets)
+    PlayMusicHmm = odessa.hmm(8, numDataSets)
     PlayMusicHmm.loadData("PlayMusic")
     
     """ Stop Music HMM """
     
-    StopMusicHmm = odessa.hmm(9, leftToRight, numDataSets)
+    StopMusicHmm = odessa.hmm(9, numDataSets)
     StopMusicHmm.loadData("StopMusic")
     
     """ Turn Off The Lights HMM """
     
-    TurnOffTheLightsHmm = odessa.hmm(9, leftToRight, numDataSets)
+    TurnOffTheLightsHmm = odessa.hmm(9, numDataSets)
     TurnOffTheLightsHmm.loadData("TurnOffTheLights")
     
     """ Turn On The Lights HMM """
     
-    TurnOnTheLightsHmm = odessa.hmm(9, leftToRight, numDataSets)
+    TurnOnTheLightsHmm = odessa.hmm(9, numDataSets)
     TurnOnTheLightsHmm.loadData("TurnOnTheLights")
     
     """ What Time Is It HMM """
     
-    WhatTimeIsItHmm = odessa.hmm(9, leftToRight, numDataSets)
+    WhatTimeIsItHmm = odessa.hmm(9, numDataSets)
     WhatTimeIsItHmm.loadData("WhatTimeIsIt")
     
     probOdessa, llOdessa, alphaOdessa, betaOdessa, Bodessa = OdessaHmm.probEvidence(mfcc)

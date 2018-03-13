@@ -104,19 +104,17 @@ class mfcc:
 
 class hmm:
     """ A class to implement a HMM for speech recognition """
-    def __init__(self, numStates, leftToRight, numDataSets):
+    def __init__(self, numStates, numDataSets):
         """ Initialize HMM variables """
         self.Q = numStates  # Number of states to use in the HMM
                             # (should be the number of phonenems in the phrase)
         
         self.randState = np.random.RandomState(0)
         
-        self.leftToRight = leftToRight
-        
         # Initialize transition matrix with random probabilities
         self.A = self.randState.rand(self.Q,self.Q)
         # Force all the rows of A to sum to 1
-        self.A = hmm.sumToOne(self, self.A)
+        #self.A = hmm.sumToOne(self, self.A)
             
         self.xiSum = np.zeros((self.Q,self.Q))
         
@@ -199,7 +197,7 @@ class hmm:
         # Initialize transition matrix with random probabilities
         self.A = self.randState.rand(self.Q,self.Q)
         # Force all the rows of A to sum to 1
-        self.A = hmm.sumToOne(self, self.A)
+        #self.A = hmm.sumToOne(self, self.A)
         
         self.xiSum = np.zeros((self.Q,self.Q))
         

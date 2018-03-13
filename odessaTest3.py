@@ -54,7 +54,7 @@ if __name__ == "__main__":
     d1 = np.random.rand(ydim, xdim)
     
     # Initialize the "Odessa" HMM
-    hmm1 = odessa.hmm(numStates, leftToRight, numDataSets)
+    hmm1 = odessa.hmm(numStates, numDataSets)
     
     # Train the "Odessa" HMM
     conv1 = hmm1.train(d1, numIter)
@@ -67,7 +67,7 @@ if __name__ == "__main__":
     d2 = np.random.rand(ydim, xdim)
     
     # Initialize the "Odessa" HMM
-    hmm2 = odessa.hmm(numStates, leftToRight, numDataSets)
+    hmm2 = odessa.hmm(numStates, numDataSets)
     
     # Train the "Odessa" HMM
     conv2 = hmm2.train(d2, numIter)

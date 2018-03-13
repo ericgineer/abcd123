@@ -36,7 +36,7 @@ def inithmm(hmmName, numHmmStates, frameSize, skipSize, numCoef, numDataSets, nu
     #d1 = np.random.rand(ydim, xdim)
     
     # Initialize the  HMM
-    hmm = odessa.hmm(numHmmStates, leftToRight, numDataSets)
+    hmm = odessa.hmm(numHmmStates, numDataSets)
     
     # Train the HMM
     print("Training the ",hmmName," HMM")
