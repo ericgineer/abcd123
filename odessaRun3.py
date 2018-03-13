@@ -6,7 +6,6 @@ import odessa
 import pyaudio
 import sys
 from multiprocessing import Pipe
-import os
 
 plt.close('all')
 

@@ -22,8 +22,8 @@ def recordAudio(frameSize, skipSize, numCoef):
     fs = 16000
 
     print('Recording start')
-    myrec = sd.rec(int(duration * fs), samplerate=fs, channels=CHANNELS)
-    sd.wait()
+    #myrec = sd.rec(int(duration * fs), samplerate=fs, channels=CHANNELS)
+    #sd.wait()
     print('Recording stop')
     sd.playrec(myrec, fs, channels=CHANNELS)
     mfcc = odessa.mfcc.getMfcc(np.reshape(myrec, len(myrec)), fs, frameSize, skipSize, numCoef)

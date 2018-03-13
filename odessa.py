@@ -113,26 +113,11 @@ class hmm:
         
         self.leftToRight = leftToRight
         
-        #self.A = self.stochasticize(self.randState.rand(self.Q, self.Q))
-        
         # Initialize transition matrix with random probabilities
-        if self.leftToRight == 1:
-            self.A = np.zeros((self.Q, self.Q))
-            for i in range(0,self.Q):
-                for j in range(0,self.Q):
-                    if j < i:
-                        self.A[i,j] = 0
-                    elif i == self.Q-1 and j == self.Q-1:
-                        self.A[i,j] = 1
-                    elif i == 0 and j == 0:
-                        self.A[i,j] = 0
-                    elif j > i + 1:
-                        self.A[i,j] = 0
-                    else:
-                        self.A[i,j] = np.random.rand()
-        else:
-            self.A = self.randState.rand(self.Q,self.Q)
-        
+        self.A = self.randState.rand(self.Q,self.Q)
+        # Force all the rows of A to sum to 1
+        self.A = hmm.sumToOne(self, self.A)
+            
         self.xiSum = np.zeros((self.Q,self.Q))
         
         self.mu = []
@@ -150,7 +135,7 @@ class hmm:
         self.beta = []
 
     """ Function to calculate the path weight matrix p(x_t | Q_t = q) """
-    def pathWeights(self, x):
+    def emissionProbability(self, x):
         self.numCoef = x.shape[0]
         self.T = x.shape[1]
         B = np.zeros((self.Q, self.T))
@@ -160,18 +145,12 @@ class hmm:
                 for c in range(self.numCoef):
                     exponent += (x[c,t]-self.mu[c,q]) * 1/self.C[c,c,q] * (x[c,t]-self.mu[c,q])
                 B[q,t] = 1/np.sqrt(np.linalg.det(2*np.pi*self.C[:,:,q]))*np.exp(-1/2 * exponent)
-                
-#        x = np.atleast_2d(x)
-#        for s in range(self.Q):
-#            #Needs scipy 0.14
-#            np.random.seed(self.random_state.randint(1))
-#            self.B[s, :] = st.multivariate_normal.pdf(
-#                x.T, mean=self.mu[:, s].T, cov=self.C[:, :, s].T)
+
         return B
     
     """ Calculate the probability of evidence p(x_1:T) """
     def probEvidence(self, mfcc):
-        B = hmm.pathWeights(self, mfcc)
+        B = hmm.emissionProbability(self, mfcc)
         logLikelihood, alpha = hmm.alphaRecursion(self, B)
         beta = hmm.betaRecursion(self, B)
         pEvidence = np.zeros(self.T)
@@ -204,8 +183,9 @@ class hmm:
     def normalize(self, x):
         return (x + (x == 0)) / np.sum(x)
     
-    def stochasticize(self, x):
-        return (x + (x == 0)) / np.sum(x, axis=1)
+    def sumToOne(self, x):
+        return (x.T / np.sum(x,axis=1)).T
+        
     
     def odessaInit(self, x, numDataSets):
         self.numCoef = x.shape[0] # Number of MFCC coefficients
@@ -216,7 +196,10 @@ class hmm:
         
         self.randState = np.random.RandomState(0)
         
-        self.A = self.stochasticize(self.randState.rand(self.Q, self.Q))
+        # Initialize transition matrix with random probabilities
+        self.A = self.randState.rand(self.Q,self.Q)
+        # Force all the rows of A to sum to 1
+        self.A = hmm.sumToOne(self, self.A)
         
         self.xiSum = np.zeros((self.Q,self.Q))
         
@@ -251,17 +234,12 @@ class hmm:
     
     """ Expectation-Maximization algorithm """
     def em(self, x):        
-        B = hmm.pathWeights(self, x)    
+        B = hmm.emissionProbability(self, x)    
         
         A = self.A
          
         logLikelihood, alpha = hmm.alphaRecursion(self, B)
         beta = hmm.betaRecursion(self, B)
-        #logLikelihood, alpha = hmm._forward(self, B)
-        #beta = hmm._backward(self, B)
-        
-        #logLikelihood, alpha = hmm._forward(self, B)
-        #beta = hmm.betaRecursion(self, B)
         
         # Calculate gamma
         gamma = np.zeros((self.Q, self.T))
@@ -281,8 +259,7 @@ class hmm:
         
         xi = np.zeros((self.Q,self.Q,self.T))
         self.xiSum = np.zeros((self.Q,self.Q))
-        #xi[:,:,0] = hmm.normalize(self, np.dot(self.alphaPrev, (beta[:,t] * B[:,t]).T) * A) # / pEvidence[0]
-        #self.xiSum = xi[:,:,0]
+
         for t in range(self.T-1):
             xi[:,:,t] = hmm.normalize(self, np.dot(alpha[:,t], (beta[:,t] * B[:,t+1]).T) * A / pEvidence[t])
             self.xiSum += xi[:,:,t]
@@ -296,18 +273,6 @@ class hmm:
                     numA += xi[i,j,t]
                     denA += gamma[i,t]
                 A[i,j] = numA/denA
-        
-        # Zero out un-needed A elements
-#        if self.leftToRight == 1:
-#            for i in range(0,self.Q):
-#                for j in range(0,self.Q):
-#                    if j < i:
-#                        A[i,j] = 0
-#                    elif i == 0 and j == 0:
-#                        A[i,j] = 0
-#                    elif j > i + 1:
-#                        A[i,j] = 0
-
                 
         # Update mu
         mu = np.zeros((self.numCoef,self.Q))
@@ -330,11 +295,6 @@ class hmm:
             for c in range(self.numCoef):
                 C[c,c,q] = numC[c] / denC
                 
-#        expected_covs = np.zeros((self.numCoef, self.numCoef, self.Q))
-#        expected_covs += .01 * np.eye(self.numCoef)[:, :, None]
-#        for q in range(self.Q):
-#            C[:,:,q] += .01 * np.eye(self.numCoef)
-                
         # Update state variables
         self.alpha = alpha
         self.beta  = beta
@@ -353,7 +313,7 @@ class hmm:
         gamma = np.zeros((self.Q, self.T,self.L))
         xi = np.zeros((self.Q,self.Q,self.T,self.L))
         for l in range(self.L):        
-            B = hmm.pathWeights(self, x[:,:,l])    
+            B = hmm.emissionProbability(self, x[:,:,l])    
          
             logLikelihood, alpha = hmm.alphaRecursion(self, B)
             beta = hmm.betaRecursion(self, B)
@@ -409,11 +369,6 @@ class hmm:
                     denC += gamma[q,t,l]
             for c in range(self.numCoef):
                 C[c,c,q] = numC[c] / denC
-                
-#        expected_covs = np.zeros((self.numCoef, self.numCoef, self.Q))
-#        expected_covs += .01 * np.eye(self.numCoef)[:, :, None]
-#        for q in range(self.Q):
-#            C[:,:,q] += .01 * np.eye(self.numCoef)
                 
         # Update state variables
         self.alpha = alpha

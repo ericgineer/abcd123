@@ -43,7 +43,7 @@ if __name__ == "__main__":
     
     numIter = 15 # number of EM algorithm iterations
     
-    leftToRight = 0 # Force a left to right HMM
+    leftToRight = 1 # Force a left to right HMM
     
     """ HMM 1 """
     
