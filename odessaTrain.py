@@ -93,3 +93,6 @@ if __name__ == "__main__":
     plt.plot(TurnOffTheLightsConv)
     plt.plot(TurnOnTheLightsConv)
     plt.plot(WhatTimeIsItConv)
+    plt.title('EM training convergence')
+    plt.xlabel('Iteration')
+    plt.ylabel('Log likelihood')
